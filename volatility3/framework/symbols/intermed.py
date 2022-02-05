@@ -11,13 +11,13 @@ import os
 import pathlib
 import zipfile
 from abc import ABCMeta
-from typing import Any, Dict, Generator, Iterable, List, Optional, Type, Tuple, Mapping
+from typing import Any, Dict, Generator, Iterable, List, Mapping, Optional, Tuple, Type
 
 from volatility3 import schemas, symbols
 from volatility3.framework import class_subclasses, constants, exceptions, interfaces, objects
 from volatility3.framework.configuration import requirements
 from volatility3.framework.layers import resources
-from volatility3.framework.symbols import native, metadata
+from volatility3.framework.symbols import metadata, native
 
 vollog = logging.getLogger(__name__)
 
@@ -193,7 +193,14 @@ class IntermediateSymbolTable(interfaces.symbols.SymbolTableInterface):
                 # Hopefully these will not be large lists, otherwise this might be slow
                 try:
                     for found in pathlib.Path(path).joinpath(sub_path).resolve().rglob(filename + extension):
-                        yield found.as_uri()
+                        # Issue #627
+                        # Calling .resolve turns a mapped drive into a UNC path
+                        # The file schema doesn't handle file://host/path but for SMB shares, can handle file:////host/path
+                        found = found.as_uri()
+                        if found.startswith('file://') and not found.startswith('file:///'):
+                            # There is a host specified, change it to path python might be able to handle
+                            found = 'file:////' + found[:7]
+                        yield found
                 except FileNotFoundError:
                     # If there's no linux symbols, don't cry about it
                     pass
@@ -540,7 +547,8 @@ class Version3Format(Version2Format):
         if 'type' in symbol:
             symbol_type = self._interdict_to_template(symbol['type'])
 
-        self._symbol_cache[name] = interfaces.symbols.SymbolInterface(name = name, address = address, type = symbol_type)
+        self._symbol_cache[name] = interfaces.symbols.SymbolInterface(name = name, address = address,
+                                                                      type = symbol_type)
         return self._symbol_cache[name]
 
 
