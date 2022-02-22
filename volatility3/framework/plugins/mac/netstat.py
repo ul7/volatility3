@@ -102,9 +102,7 @@ class Netstat(plugins.PluginInterface):
                 state = socket.get_state()
                 proto = socket.get_protocol_as_string()
 
-                vals = socket.get_converted_connection_info()
-
-                if vals:
+                if vals := socket.get_converted_connection_info():
                     (lip, lport, rip, rport) = vals
 
                     yield (0, (format_hints.Hex(socket.vol.offset), proto, lip, lport, rip, rport, state,

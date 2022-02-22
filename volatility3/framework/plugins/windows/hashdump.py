@@ -82,7 +82,7 @@ class Hashdump(interfaces.plugins.PluginInterface):
     @classmethod
     def get_bootkey(cls, syshive: registry.RegistryHive) -> Optional[bytes]:
         cs = 1
-        lsa_base = f"ControlSet{cs:03}" + "\\Control\\Lsa"
+        lsa_base = f'ControlSet{cs:03}\\Control\\Lsa'
         lsa_keys = ["JD", "Skew1", "GBG", "Data"]
 
         lsa = cls.get_hive_key(syshive, lsa_base)
@@ -93,18 +93,18 @@ class Hashdump(interfaces.plugins.PluginInterface):
         bootkey = ''
 
         for lk in lsa_keys:
-            key = cls.get_hive_key(syshive, lsa_base + '\\' + lk)
-            class_data = None
-            if key:
+            if key := cls.get_hive_key(syshive, f'{lsa_base}\\{lk}'):
                 class_data = syshive.read(key.Class + 4, key.ClassLength)
-
+            else:
+                class_data = None
             if class_data is None:
                 return None
             bootkey += class_data.decode('utf-16-le')
 
         bootkey_str = binascii.unhexlify(bootkey)
-        bootkey_scrambled = bytes([bootkey_str[cls.bootkey_perm_table[i]] for i in range(len(bootkey_str))])
-        return bootkey_scrambled
+        return bytes(
+            bootkey_str[cls.bootkey_perm_table[i]] for i in range(len(bootkey_str))
+        )
 
     @classmethod
     def get_hbootkey(cls, samhive: registry.RegistryHive, bootkey: bytes) -> Optional[bytes]:
@@ -203,9 +203,9 @@ class Hashdump(interfaces.plugins.PluginInterface):
     def sid_to_key(cls, sid: int) -> Tuple[bytes, bytes]:
         """Takes rid of a user and converts it to a key to be used by the DES cipher"""
         bytestr1 = [sid & 0xFF, (sid >> 8) & 0xFF, (sid >> 16) & 0xFF, (sid >> 24) & 0xFF]
-        bytestr1 += bytestr1[0:3]
-        bytestr2 = [bytestr1[3]] + bytestr1[0:3]
-        bytestr2 += bytestr2[0:3]
+        bytestr1 += bytestr1[:3]
+        bytestr2 = [bytestr1[3]] + bytestr1[:3]
+        bytestr2 += bytestr2[:3]
         return cls.sidbytes_to_key(bytes(bytestr1)), cls.sidbytes_to_key(bytes(bytestr2))
 
     @classmethod
@@ -247,8 +247,7 @@ class Hashdump(interfaces.plugins.PluginInterface):
         if name_length > len(value):
             return None
 
-        username = value[name_offset:name_offset + name_length]
-        return username
+        return value[name_offset:name_offset + name_length]
 
     # replaces the dump_hashes method in vol2
     def _generator(self, syshive: registry.RegistryHive, samhive: registry.RegistryHive):
@@ -264,8 +263,7 @@ class Hashdump(interfaces.plugins.PluginInterface):
         hbootkey = self.get_hbootkey(samhive, bootkey)
         if hbootkey:
             for user in self.get_user_keys(samhive):
-                ret = self.get_user_hashes(user, samhive, hbootkey)
-                if ret:
+                if ret := self.get_user_hashes(user, samhive, hbootkey):
                     lmhash, nthash = ret
 
                     ## temporary fix to prevent UnicodeDecodeError backtraces

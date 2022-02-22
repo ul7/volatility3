@@ -27,7 +27,7 @@ class Certificates(interfaces.plugins.PluginInterface):
         name = renderers.NotAvailableValue()
         certificate_data = renderers.NotAvailableValue()
         while len(data) > 12:
-            ctype, clength = struct.unpack("<QI", data[0:12])
+            ctype, clength = struct.unpack("<QI", data[:12])
             cvalue, data = data[12:12 + clength], data[12 + clength:]
             if ctype == 0x10000000b:
                 name = str(cvalue, 'utf-16').strip("\x00")

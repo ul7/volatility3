@@ -20,8 +20,4 @@ class Flags:
 
     def __call__(self, value: int) -> List[str]:
         """Return the appropriate Flags."""
-        result = []
-        for k, v in self.choices.items():
-            if value & v:
-                result.append(k)
-        return result
+        return [k for k, v in self.choices.items() if value & v]

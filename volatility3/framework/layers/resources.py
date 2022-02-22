@@ -103,21 +103,19 @@ class ResourceAccessor(object):
         try:
             fp = urllib.request.urlopen(url, context = self._context)
         except error.URLError as excp:
-            if excp.args:
-                # TODO: As of python3.7 this can be removed
-                unverified_retrieval = (hasattr(ssl, "SSLCertVerificationError") and isinstance(
-                    excp.args[0], ssl.SSLCertVerificationError)) or (isinstance(excp.args[0], ssl.SSLError) and
-                                                                     excp.args[0].reason == "CERTIFICATE_VERIFY_FAILED")
-                if unverified_retrieval:
-                    vollog.warning("SSL certificate verification failed: attempting UNVERIFIED retrieval")
-                    non_verifying_ctx = ssl.SSLContext()
-                    non_verifying_ctx.check_hostname = False
-                    non_verifying_ctx.verify_mode = ssl.CERT_NONE
-                    fp = urllib.request.urlopen(url, context = non_verifying_ctx)
-                else:
-                    raise excp
-            else:
+            if not excp.args:
                 raise excp
+            # TODO: As of python3.7 this can be removed
+            unverified_retrieval = (hasattr(ssl, "SSLCertVerificationError") and isinstance(
+                excp.args[0], ssl.SSLCertVerificationError)) or (isinstance(excp.args[0], ssl.SSLError) and
+                                                                 excp.args[0].reason == "CERTIFICATE_VERIFY_FAILED")
+            if not unverified_retrieval:
+                raise excp
+            vollog.warning("SSL certificate verification failed: attempting UNVERIFIED retrieval")
+            non_verifying_ctx = ssl.SSLContext()
+            non_verifying_ctx.check_hostname = False
+            non_verifying_ctx.verify_mode = ssl.CERT_NONE
+            fp = urllib.request.urlopen(url, context = non_verifying_ctx)
         except exceptions.OfflineException:
             vollog.info(f"Not accessing {url} in offline mode")
             raise
@@ -143,18 +141,14 @@ class ResourceAccessor(object):
                     except AttributeError:
                         # If our fp doesn't have an info member, carry on gracefully
                         content_length = -1
-                    cache_file = open(temp_filename, "wb")
-
-                    count = 0
-                    block = fp.read(block_size)
-                    while block:
-                        count += len(block)
-                        if self._progress_callback:
-                            self._progress_callback(count * 100 / max(count, int(content_length)),
-                                                    f"Reading file {url}")
-                        cache_file.write(block)
-                        block = fp.read(block_size)
-                    cache_file.close()
+                    with open(temp_filename, "wb") as cache_file:
+                        count = 0
+                        while block := fp.read(block_size):
+                            count += len(block)
+                            if self._progress_callback:
+                                self._progress_callback(count * 100 / max(count, int(content_length)),
+                                                        f"Reading file {url}")
+                            cache_file.write(block)
                 # Re-open the cache with a different mode
                 # Since we don't want people thinking they're able to save to the cache file,
                 # open it in read mode only and allow breakages to happen if they wanted to write
@@ -239,21 +233,21 @@ class JarHandler(VolatilityHandler):
     @staticmethod
     def default_open(req: urllib.request.Request) -> Optional[Any]:
         """Handles the request if it's the jar scheme."""
-        if req.type == 'jar':
-            subscheme, remainder = req.full_url.split(":")[1], ":".join(req.full_url.split(":")[2:])
-            if subscheme != 'file':
-                vollog.log(constants.LOGLEVEL_VVV, f"Unsupported jar subscheme {subscheme}")
-                return None
+        if req.type != 'jar':
+            return None
+        subscheme, remainder = req.full_url.split(":")[1], ":".join(req.full_url.split(":")[2:])
+        if subscheme != 'file':
+            vollog.log(constants.LOGLEVEL_VVV, f"Unsupported jar subscheme {subscheme}")
+            return None
 
-            zipsplit = remainder.split("!")
-            if len(zipsplit) != 2:
-                vollog.log(constants.LOGLEVEL_VVV,
-                           f"Path did not contain exactly one fragment indicator: {remainder}")
-                return None
+        zipsplit = remainder.split("!")
+        if len(zipsplit) != 2:
+            vollog.log(constants.LOGLEVEL_VVV,
+                       f"Path did not contain exactly one fragment indicator: {remainder}")
+            return None
 
-            zippath, filepath = zipsplit
-            return zipfile.ZipFile(zippath).open(filepath)
-        return None
+        zippath, filepath = zipsplit
+        return zipfile.ZipFile(zippath).open(filepath)
 
 
 class OfflineHandler(VolatilityHandler):

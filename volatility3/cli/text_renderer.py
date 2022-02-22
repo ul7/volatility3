@@ -34,11 +34,10 @@ def hex_bytes_as_text(value: bytes) -> str:
     """
     if not isinstance(value, bytes):
         raise TypeError(f"hex_bytes_as_text takes bytes not: {type(value)}")
+    output = ""
     ascii = []
     hex = []
-    count = 0
-    output = ""
-    for byte in value:
+    for count, byte in enumerate(value):
         hex.append(f"{byte:02x}")
         ascii.append(chr(byte) if 0x20 < byte <= 0x7E else ".")
         if (count % 8) == 7:
@@ -46,7 +45,6 @@ def hex_bytes_as_text(value: bytes) -> str:
             output += " ".join(hex[count - 7:count + 1])
             output += "\t"
             output += "".join(ascii[count - 7:count + 1])
-        count += 1
     return output
 
 
@@ -70,10 +68,7 @@ def optional(func: Callable) -> Callable:
     @wraps(func)
     def wrapped(x: Any) -> str:
         if isinstance(x, interfaces.renderers.BaseAbsentValue):
-            if isinstance(x, renderers.NotApplicableValue):
-                return "N/A"
-            else:
-                return "-"
+            return "N/A" if isinstance(x, renderers.NotApplicableValue) else "-"
         return func(x)
 
     return wrapped
@@ -84,7 +79,7 @@ def quoted_optional(func: Callable) -> Callable:
     @wraps(func)
     def wrapped(x: Any) -> str:
         result = optional(func)(x)
-        if result == "-" or result == "N/A":
+        if result in ["-", "N/A"]:
             return ""
         if isinstance(x, format_hints.MultiTypeData) and x.converted_int:
             return f"{result}"
@@ -228,7 +223,7 @@ class CSVRenderer(CLIRenderer):
         def visitor(node: interfaces.renderers.TreeNode, accumulator):
             accumulator.write("\n")
             # Nodes always have a path value, giving them a path_depth of at least 1, we use max just in case
-            accumulator.write(str(max(0, node.path_depth - 1)) + ",")
+            accumulator.write(f'{str(max(0, node.path_depth - 1))},')
             line = []
             for column_index in range(len(grid.columns)):
                 column = grid.columns[column_index]
@@ -283,7 +278,7 @@ class PrettyTextRenderer(CLIRenderer):
                 column = grid.columns[column_index]
                 renderer = self._type_renderers.get(column.type, self._type_renderers['default'])
                 data = renderer(node.values[column_index])
-                field_width = max([len(self.tab_stop(x)) for x in f"{data}".split("\n")])
+                field_width = max(len(self.tab_stop(x)) for x in f"{data}".split("\n"))
                 max_column_widths[column.name] = max(max_column_widths.get(column.name, len(column.name)),
                                                      field_width)
                 line[column] = data.split("\n")
@@ -319,12 +314,9 @@ class PrettyTextRenderer(CLIRenderer):
 
     def tab_stop(self, line: str) -> str:
         tab_width = 8
-        while line.find('\t') >= 0:
+        while '\t' in line:
             i = line.find('\t')
-            if (tab_width > 0):
-                pad = " " * (tab_width - (i % tab_width))
-            else:
-                pad = ""
+            pad = " " * (tab_width - (i % tab_width)) if (tab_width > 0) else ""
             line = line.replace("\t", pad, 1)
         return line
 

@@ -64,13 +64,11 @@ def choose_automagic(
         return automagics
     vollog.info(f"Detected a {plugin_category} category plugin")
 
-    output = []
-    for amagic in automagics:
-        if plugin_category not in amagic.exclusion_list:
-            # Only include uncategorized automagic, or platform specific automagic
-            # (This allows user defined/uncategorized automagic to be included)
-            output += [amagic]
-    return output
+    return [
+        amagic
+        for amagic in automagics
+        if plugin_category not in amagic.exclusion_list
+    ]
 
 
 def run(automagics: List[interfaces.automagic.AutomagicInterface],

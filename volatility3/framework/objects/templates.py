@@ -65,10 +65,10 @@ class ObjectTemplate(interfaces.objects.Template):
 
         Returns: an object adhereing to the :class:`~volatility3.framework.interfaces.objects.ObjectInterface`
         """
-        arguments: Dict[str, Any] = {}
-        for arg in self.vol:
-            if arg != 'object_class':
-                arguments[arg] = self.vol[arg]
+        arguments: Dict[str, Any] = {
+            arg: self.vol[arg] for arg in self.vol if arg != 'object_class'
+        }
+
         return self.vol.object_class(context = context, object_info = object_info, **arguments)
 
 
@@ -88,9 +88,7 @@ class ReferenceTemplate(interfaces.objects.Template):
         provide information such as size This is because the size request has
         no context within which to determine the actual symbol structure."""
         type_name = self.vol.type_name.split(constants.BANG)
-        table_name = None
-        if len(type_name) == 2:
-            table_name = type_name[0]
+        table_name = type_name[0] if len(type_name) == 2 else None
         symbol_name = type_name[-1]
         raise exceptions.SymbolError(
             symbol_name, table_name,

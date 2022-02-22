@@ -129,7 +129,7 @@ class QemuSuspendLayer(segmented.NonLinearlySegmentedLayer):
             self._configuration = self._read_configuration(base_layer, self.name)
         section_byte = -1
         index = 8
-        section_info = dict()
+        section_info = {}
         current_section_id = -1
         version_id = -1
         name = None
@@ -143,7 +143,7 @@ class QemuSuspendLayer(segmented.NonLinearlySegmentedLayer):
                                                   offset = index,
                                                   layer_name = self._base_layer)
                 index += 4 + section_len
-            elif section_byte == self.QEVM_SECTION_START or section_byte == self.QEVM_SECTION_FULL:
+            elif section_byte in [self.QEVM_SECTION_START, self.QEVM_SECTION_FULL]:
                 section_id = self.context.object(self._qemu_table_name + constants.BANG + 'unsigned long',
                                                  offset = index,
                                                  layer_name = self._base_layer)
@@ -170,7 +170,7 @@ class QemuSuspendLayer(segmented.NonLinearlySegmentedLayer):
                 section_info[current_section_id] = {'name': name, 'version_id': version_id}
                 # Read additional data
                 index = self.extract_data(index, name, version_id)
-            elif section_byte == self.QEVM_SECTION_PART or section_byte == self.QEVM_SECTION_END:
+            elif section_byte in [self.QEVM_SECTION_PART, self.QEVM_SECTION_END]:
                 section_id = self.context.object(self._qemu_table_name + constants.BANG + 'unsigned long',
                                                  offset = index,
                                                  layer_name = self._base_layer)
@@ -187,9 +187,7 @@ class QemuSuspendLayer(segmented.NonLinearlySegmentedLayer):
                 if section_id != current_section_id:
                     raise exceptions.LayerException(
                         self._name, f'QEMU section footer mismatch: {current_section_id} and {section_id}')
-            elif section_byte == self.QEVM_EOF:
-                pass
-            else:
+            elif section_byte != self.QEVM_EOF:
                 raise exceptions.LayerException(self._name, f'QEMU unknown section encountered: {section_byte}')
 
     def extract_data(self, index, name, version_id):
@@ -236,9 +234,8 @@ class QemuSuspendLayer(segmented.NonLinearlySegmentedLayer):
         # (We assume that page_size is a power of 2)
         start_offset = offset ^ (offset & (page_size - 1))
         if start_offset in self._compressed:
-            data = (data * page_size)
-        result = data[offset - start_offset:output_length + offset - start_offset]
-        return result
+            data *= page_size
+        return data[offset - start_offset:output_length + offset - start_offset]
 
     @functools.lru_cache(maxsize = 512)
     def read(self, offset: int, length: int, pad: bool = False) -> bytes:

@@ -43,8 +43,7 @@ class LinuxIntelStacker(interfaces.automagic.StackerLayerInterface):
             dtb = None
             vollog.debug(f"Identified banner: {repr(banner)}")
 
-            symbol_files = linux_banners.get(banner, None)
-            if symbol_files:
+            if symbol_files := linux_banners.get(banner, None):
                 isf_path = symbol_files[0]
                 table_name = context.symbol_space.free_table_name('LintelStacker')
                 table = linux.LinuxKernelIntermedSymbols(context,

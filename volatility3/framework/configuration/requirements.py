@@ -106,13 +106,13 @@ class ListRequirement(interfaces.configuration.RequirementInterface):
         if not isinstance(value, list):
             # TODO: Check this is the correct response for an error
             raise TypeError(f"Unexpected config value found: {repr(value)}")
-        if not (self.min_elements <= len(value)):
+        if self.min_elements > len(value):
             vollog.log(constants.LOGLEVEL_V, "TypeError - Too few values provided to list option.")
             return {config_path: self}
-        if self.max_elements and not (len(value) < self.max_elements):
+        if self.max_elements and len(value) >= self.max_elements:
             vollog.log(constants.LOGLEVEL_V, "TypeError - Too many values provided to list option.")
             return {config_path: self}
-        if not all([isinstance(element, self.element_type) for element in value]):
+        if not all(isinstance(element, self.element_type) for element in value):
             vollog.log(constants.LOGLEVEL_V, "TypeError - At least one element in the list is not of the correct type.")
             return {config_path: self}
         return {}
@@ -128,7 +128,9 @@ class ChoiceRequirement(interfaces.configuration.RequirementInterface):
             choices: A list of possible string options that can be chosen from
         """
         super().__init__(*args, **kwargs)
-        if not isinstance(choices, list) or any([not isinstance(choice, str) for choice in choices]):
+        if not isinstance(choices, list) or any(
+            not isinstance(choice, str) for choice in choices
+        ):
             raise TypeError("ChoiceRequirement takes a list of strings as choices")
         self.choices = choices
 
@@ -154,8 +156,7 @@ class ComplexListRequirement(MultiRequirement,
         """Validates the provided value to ensure it is one of the available
         choices."""
         config_path = interfaces.configuration.path_join(config_path, self.name)
-        ret_list = super().unsatisfied(context, config_path)
-        if ret_list:
+        if ret_list := super().unsatisfied(context, config_path):
             return ret_list
         if (self.config_value(context, config_path, None) is None
                 or self.config_value(context, interfaces.configuration.path_join(config_path, 'number_of_elements'))):
@@ -303,7 +304,10 @@ class TranslationLayerRequirement(interfaces.configuration.ConstructableRequirem
         args = {"context": context, "config_path": config_path, "name": name}
 
         if any(
-            [subreq.unsatisfied(context, config_path) for subreq in self.requirements.values() if not subreq.optional]):
+            subreq.unsatisfied(context, config_path)
+            for subreq in self.requirements.values()
+            if not subreq.optional
+        ):
             return None
 
         obj = self._construct_class(context, config_path, args)
@@ -358,7 +362,10 @@ class SymbolTableRequirement(interfaces.configuration.ConstructableRequirementIn
         args = {"context": context, "config_path": config_path, "name": name}
 
         if any(
-            [subreq.unsatisfied(context, config_path) for subreq in self.requirements.values() if not subreq.optional]):
+            subreq.unsatisfied(context, config_path)
+            for subreq in self.requirements.values()
+            if not subreq.optional
+        ):
             return None
 
         # Fill out the parameter for class creation
@@ -482,7 +489,10 @@ class ModuleRequirement(interfaces.configuration.ConstructableRequirementInterfa
         args = {"context": context, "config_path": config_path, "name": name}
 
         if any(
-            [subreq.unsatisfied(context, config_path) for subreq in self.requirements.values() if not subreq.optional]):
+            subreq.unsatisfied(context, config_path)
+            for subreq in self.requirements.values()
+            if not subreq.optional
+        ):
             return None
 
         obj = self._construct_class(context, config_path, args)

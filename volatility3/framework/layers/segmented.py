@@ -45,7 +45,10 @@ class NonLinearlySegmentedLayer(interfaces.layers.TranslationLayerInterface, met
         try:
             base_layer = self._context.layers[self._base_layer]
             return all(
-                [base_layer.is_valid(mapped_offset) for _i, _i, mapped_offset, _i, _s in self.mapping(offset, length)])
+                base_layer.is_valid(mapped_offset)
+                for _i, _i, mapped_offset, _i, _s in self.mapping(offset, length)
+            )
+
         except exceptions.InvalidAddressException:
             return False
 
@@ -64,9 +67,8 @@ class NonLinearlySegmentedLayer(interfaces.layers.TranslationLayerInterface, met
             segment = self._segments[i - 1]
             if segment[0] <= offset < segment[0] + segment[2]:
                 return segment
-        if next:
-            if i < len(self._segments):
-                return self._segments[i]
+        if next and i < len(self._segments):
+            return self._segments[i]
         raise exceptions.InvalidAddressException(self.name, offset, f"Invalid address at {offset:0x}")
 
     # Determines whether larger segments are in use and the offsets within them should be tracked linearly

@@ -29,7 +29,7 @@ def convert_data_to_value(data: bytes, struct_type: Type[TUnion[int, float, byte
             raise ValueError("Invalid float size")
         struct_format = ("<" if data_format.byteorder == 'little' else ">") + float_vals[data_format.length]
     elif struct_type in [bytes, str]:
-        struct_format = str(data_format.length) + "s"
+        struct_format = f'{str(data_format.length)}s'
     else:
         raise TypeError(f"Cannot construct struct format for type {type(struct_type)}")
 
@@ -59,7 +59,7 @@ def convert_value_to_data(value: TUnion[int, float, bytes, str, bool], struct_ty
     elif struct_type in [bytes, str]:
         if isinstance(value, str):
             value = bytes(value, 'latin-1')
-        struct_format = str(data_format.length) + "s"
+        struct_format = f'{str(data_format.length)}s'
     else:
         raise TypeError(f"Cannot construct struct format for type {type(struct_type)}")
 
@@ -131,10 +131,12 @@ class PrimitiveObject(interfaces.objects.ObjectInterface):
     def __getnewargs_ex__(self):
         """Make sure that when pickling, all appropriate parameters for new are
         provided."""
-        kwargs = {}
-        for k, v in self._vol.maps[-1].items():
-            if k not in ["context", "data_format", "object_info", "type_name"]:
-                kwargs[k] = v
+        kwargs = {
+            k: v
+            for k, v in self._vol.maps[-1].items()
+            if k not in ["context", "data_format", "object_info", "type_name"]
+        }
+
         kwargs['new_value'] = self.__new_value
         return (self._context, self._vol.maps[-3]['type_name'], self._vol.maps[-2], self._data_format), kwargs
 
@@ -346,7 +348,7 @@ class Pointer(Integer):
     def __getattr__(self, attr: str) -> Any:
         """Convenience function to access unknown attributes by getting them
         from the subtype object."""
-        if attr in ['vol', '_vol', '_cache']:
+        if attr in {'vol', '_vol', '_cache'}:
             raise AttributeError("Pointer not initialized before use")
         return getattr(self.dereference(), attr)
 
@@ -363,17 +365,14 @@ class Pointer(Integer):
         @classmethod
         def children(cls, template: interfaces.objects.Template) -> List[interfaces.objects.Template]:
             """Returns the children of the template."""
-            if 'subtype' in template.vol:
-                return [template.vol.subtype]
-            return []
+            return [template.vol.subtype] if 'subtype' in template.vol else []
 
         @classmethod
         def replace_child(cls, template: interfaces.objects.Template, old_child: interfaces.objects.Template,
                           new_child: interfaces.objects.Template) -> None:
             """Substitutes the old_child for the new_child."""
-            if 'subtype' in template.vol:
-                if template.vol.subtype == old_child:
-                    template.update_vol(subtype = new_child)
+            if 'subtype' in template.vol and template.vol.subtype == old_child:
+                template.update_vol(subtype = new_child)
 
         @classmethod
         def has_member(cls, template: interfaces.objects.Template, member_name: str) -> bool:
@@ -419,17 +418,14 @@ class BitField(interfaces.objects.ObjectInterface, int):
         @classmethod
         def children(cls, template: interfaces.objects.Template) -> List[interfaces.objects.Template]:
             """Returns the children of the template."""
-            if 'base_type' in template.vol:
-                return [template.vol.base_type]
-            return []
+            return [template.vol.base_type] if 'base_type' in template.vol else []
 
         @classmethod
         def replace_child(cls, template: interfaces.objects.Template, old_child: interfaces.objects.Template,
                           new_child: interfaces.objects.Template) -> None:
             """Substitutes the old_child for the new_child."""
-            if 'base_type' in template.vol:
-                if template.vol.base_type == old_child:
-                    template.update_vol(base_type = new_child)
+            if 'base_type' in template.vol and template.vol.base_type == old_child:
+                template.update_vol(base_type = new_child)
 
 
 class Enumeration(interfaces.objects.ObjectInterface, int):
@@ -520,17 +516,14 @@ class Enumeration(interfaces.objects.ObjectInterface, int):
         @classmethod
         def children(cls, template: interfaces.objects.Template) -> List[interfaces.objects.Template]:
             """Returns the children of the template."""
-            if 'base_type' in template.vol:
-                return [template.vol.base_type]
-            return []
+            return [template.vol.base_type] if 'base_type' in template.vol else []
 
         @classmethod
         def replace_child(cls, template: interfaces.objects.Template, old_child: interfaces.objects.Template,
                           new_child: interfaces.objects.Template) -> None:
             """Substitutes the old_child for the new_child."""
-            if 'base_type' in template.vol:
-                if template.vol.base_type == old_child:
-                    template.update_vol(base_type = new_child)
+            if 'base_type' in template.vol and template.vol.base_type == old_child:
+                template.update_vol(base_type = new_child)
 
 
 class Array(interfaces.objects.ObjectInterface, collections.abc.Sequence):
@@ -579,17 +572,14 @@ class Array(interfaces.objects.ObjectInterface, collections.abc.Sequence):
         @classmethod
         def children(cls, template: interfaces.objects.Template) -> List[interfaces.objects.Template]:
             """Returns the children of the template."""
-            if 'subtype' in template.vol:
-                return [template.vol.subtype]
-            return []
+            return [template.vol.subtype] if 'subtype' in template.vol else []
 
         @classmethod
         def replace_child(cls, template: interfaces.objects.Template, old_child: interfaces.objects.Template,
                           new_child: interfaces.objects.Template) -> None:
             """Substitutes the old_child for the new_child."""
-            if 'subtype' in template.vol:
-                if template.vol['subtype'] == old_child:
-                    template.update_vol(subtype = new_child)
+            if 'subtype' in template.vol and template.vol['subtype'] == old_child:
+                template.update_vol(subtype = new_child)
 
         @classmethod
         def relative_child_offset(cls, template: interfaces.objects.Template, child: str) -> int:
@@ -731,7 +721,11 @@ class AggregateType(interfaces.objects.ObjectInterface):
 
         assert isinstance(members, collections.abc.Mapping)
         f"{agg_name} members parameter must be a mapping: {type(members)}"
-        assert all([(isinstance(member, tuple) and len(member) == 2) for member in members.values()])
+        assert all(
+            (isinstance(member, tuple) and len(member) == 2)
+            for member in members.values()
+        )
+
         f"{agg_name} members must be a tuple of relative_offsets and templates"
 
     def member(self, attr: str = 'member') -> object:
@@ -741,7 +735,7 @@ class AggregateType(interfaces.objects.ObjectInterface):
     def __getattr__(self, attr: str) -> Any:
         """Method for accessing members of the type."""
 
-        if attr in ['_concrete_members', 'vol']:
+        if attr in {'_concrete_members', 'vol'}:
             raise AttributeError("Object has not been properly initialized")
         if attr in self._concrete_members:
             return self._concrete_members[attr]

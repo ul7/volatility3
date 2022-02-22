@@ -43,7 +43,12 @@ class Elfs(plugins.PluginInterface):
 
             for vma in task.mm.get_mmap_iter():
                 hdr = proc_layer.read(vma.vm_start, 4, pad = True)
-                if not (hdr[0] == 0x7f and hdr[1] == 0x45 and hdr[2] == 0x4c and hdr[3] == 0x46):
+                if (
+                    hdr[0] != 0x7F
+                    or hdr[1] != 0x45
+                    or hdr[2] != 0x4C
+                    or hdr[3] != 0x46
+                ):
                     continue
 
                 path = vma.get_name(self.context, task)

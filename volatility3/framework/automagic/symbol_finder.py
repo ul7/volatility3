@@ -63,12 +63,16 @@ class SymbolFinder(interfaces.automagic.AutomagicInterface):
                 for (tl_sub_path, tl_requirement) in self._requirements:
                     tl_parent_path = interfaces.configuration.parent_path(tl_sub_path)
                     # Find the TranslationLayer sibling to the SymbolTableRequirement
-                    if (isinstance(tl_requirement, requirements.TranslationLayerRequirement)
-                            and tl_parent_path == parent_path):
-                        if context.config.get(tl_sub_path, None):
-                            self._banner_scan(context, parent_path, requirement, context.config[tl_sub_path],
-                                              progress_callback)
-                            break
+                    if (
+                        isinstance(
+                            tl_requirement,
+                            requirements.TranslationLayerRequirement,
+                        )
+                        and tl_parent_path == parent_path
+                    ) and context.config.get(tl_sub_path, None):
+                        self._banner_scan(context, parent_path, requirement, context.config[tl_sub_path],
+                                          progress_callback)
+                        break
 
     def _banner_scan(self,
                      context: interfaces.context.ContextInterface,
@@ -101,10 +105,9 @@ class SymbolFinder(interfaces.automagic.AutomagicInterface):
 
         for _, banner in banner_list:
             vollog.debug(f"Identified banner: {repr(banner)}")
-            symbol_files = self.banners.get(banner, None)
-            if symbol_files:
+            if symbol_files := self.banners.get(banner, None):
                 isf_path = symbol_files[0]
-                vollog.debug(f"Using symbol library: {symbol_files[0]}")
+                vollog.debug(f'Using symbol library: {isf_path}')
                 clazz = self.symbol_class
                 # Set the discovered options
                 path_join = interfaces.configuration.path_join
@@ -115,10 +118,6 @@ class SymbolFinder(interfaces.automagic.AutomagicInterface):
                 # Construct the appropriate symbol table
                 requirement.construct(context, config_path)
                 break
-            else:
-                if symbol_files:
-                    vollog.debug(f"Symbol library path not found: {symbol_files[0]}")
-                    # print("Kernel", banner, hex(banner_offset))
         else:
             vollog.debug("No existing banners found")
             # TODO: Fallback to generic regex search?

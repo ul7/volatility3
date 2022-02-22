@@ -39,7 +39,7 @@ class SymbolSpace(interfaces.symbols.SymbolSpaceInterface):
     def clear_symbol_cache(self, table_name: str = None) -> None:
         """Clears the symbol cache for the specified table name. If no table
         name is specified, the caches of all symbol tables are cleared."""
-        table_list: List[interfaces.symbols.BaseSymbolTableInterface] = list()
+        table_list: List[interfaces.symbols.BaseSymbolTableInterface] = []
         if table_name is None:
             table_list = list(self._dict.values())
         else:
@@ -67,10 +67,7 @@ class SymbolSpace(interfaces.symbols.SymbolSpaceInterface):
         """Returns all symbols that exist at a specific relative address."""
         table_list: Iterable[interfaces.symbols.BaseSymbolTableInterface] = self._dict.values()
         if table_name is not None:
-            if table_name in self._dict:
-                table_list = [self._dict[table_name]]
-            else:
-                table_list = []
+            table_list = [self._dict[table_name]] if table_name in self._dict else []
         for table in table_list:
             for symbol_name in table.get_symbols_by_location(offset = offset, size = size):
                 yield table.name + constants.BANG + symbol_name
@@ -227,12 +224,11 @@ class SymbolSpace(interfaces.symbols.SymbolSpaceInterface):
         """Test for membership of a component within a table."""
 
         name_array = name.split(constants.BANG)
-        if len(name_array) == 2:
-            table_name = name_array[0]
-            component_name = name_array[1]
-        else:
+        if len(name_array) != 2:
             return False
 
+        table_name = name_array[0]
+        component_name = name_array[1]
         if table_name not in self:
             return False
         table = self[table_name]

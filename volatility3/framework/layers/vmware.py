@@ -80,14 +80,17 @@ class VmwareLayer(segmented.SegmentedLayer):
                                             offset = offset + 2,
                                             max_length = name_len)
                 indices_len = (flags >> 6) & 3
-                indices = []
-                for index in range(indices_len):
-                    indices.append(
-                        self._context.object("vmware!unsigned int",
-                                             offset = offset + name_len + 2 + (index * index_len),
-                                             layer_name = self._meta_layer))
+                indices = [
+                    self._context.object(
+                        "vmware!unsigned int",
+                        offset=offset + name_len + 2 + (index * index_len),
+                        layer_name=self._meta_layer,
+                    )
+                    for index in range(indices_len)
+                ]
+
                 data_len = flags & 0x3f
-                
+
                 if data_len in [62, 63]:  # Handle special data sizes that indicate a longer data stream
                     data_len = 4 if version == 0 else 8
                     # Read the size of the data
@@ -146,8 +149,8 @@ class VmwareStacker(interfaces.automagic.StackerLayerInterface):
             return None
         location = memlayer.location
         if location.endswith(".vmem"):
-            vmss = location[:-5] + ".vmss"
-            vmsn = location[:-5] + ".vmsn"
+            vmss = f'{location[:-5]}.vmss'
+            vmsn = f'{location[:-5]}.vmsn'
             current_layer_name = context.layers.free_layer_name("VmwareMetaLayer")
             current_config_path = interfaces.configuration.path_join("automagic", "layer_stacker", "stack",
                                                                      current_layer_name)
@@ -178,6 +181,5 @@ class VmwareStacker(interfaces.automagic.StackerLayerInterface):
             new_layer_name = context.layers.free_layer_name("VmwareLayer")
             context.config[interfaces.configuration.path_join(current_config_path, "base_layer")] = layer_name
             context.config[interfaces.configuration.path_join(current_config_path, "meta_layer")] = current_layer_name
-            new_layer = VmwareLayer(context, current_config_path, new_layer_name)
-            return new_layer
+            return VmwareLayer(context, current_config_path, new_layer_name)
         return None

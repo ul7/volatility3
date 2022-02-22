@@ -35,7 +35,7 @@ class proc(generic.GenericIntelProcess):
             return None
 
         if preferred_name is None:
-            preferred_name = self.vol.layer_name + f"_Process{self.p_pid}"
+            preferred_name = f'{self.vol.layer_name}_Process{self.p_pid}'
 
         # Add the constructed layer and return the name
         return self._add_process_layer(self._context, dtb, config_prefix, preferred_name)
@@ -53,7 +53,7 @@ class proc(generic.GenericIntelProcess):
 
         seen: Set[int] = set()
 
-        for i in range(task.map.hdr.nentries):
+        for _ in range(task.map.hdr.nentries):
             if (not current_map or
                 current_map.vol.offset in seen or
                 not self._context.layers[task.vol.native_layer_name].is_valid(current_map.dereference().vol.offset, current_map.dereference().vol.size)):
@@ -78,18 +78,22 @@ class proc(generic.GenericIntelProcess):
     def get_process_memory_sections(self,
                                     context: interfaces.context.ContextInterface,
                                     config_prefix: str,
-                                    rw_no_file: bool = False) -> \
-            Generator[Tuple[int, int], None, None]:
+                                    rw_no_file: bool = False) -> Generator[Tuple[int, int], None, None]:
         """Returns a list of sections based on the memory manager's view of
         this task's virtual memory."""
         for vma in self.get_map_iter():
             start = int(vma.links.start)
             end = int(vma.links.end)
 
-            if rw_no_file:
-                if vma.get_perms() != "rw" or vma.get_path(context, config_prefix) != "":
-                    if vma.get_special_path() != "[heap]":
-                        continue
+            if (
+                rw_no_file
+                and (
+                    vma.get_perms() != "rw"
+                    or vma.get_path(context, config_prefix) != ""
+                )
+                and vma.get_special_path() != "[heap]"
+            ):
+                continue
 
             yield (start, end - start)
 
@@ -136,10 +140,7 @@ class vnode(objects.StructType):
             except exceptions.InvalidAddressException:
                 return
 
-        if int(vnodeobj.v_flag) & 0x000001 != 0 and int(vnodeobj.v_mount) != 0:
-            if int(vnodeobj.v_mount.mnt_vnodecovered) != 0:
-                self._do_calc_path(ret, vnodeobj.v_mount.mnt_vnodecovered, vnodeobj.v_mount.mnt_vnodecovered.v_name)
-        else:
+        if int(vnodeobj.v_flag) & 0x000001 == 0 or int(vnodeobj.v_mount) == 0:
             try:
                 parent = vnodeobj.v_parent
                 parent_name = parent.v_name
@@ -148,19 +149,18 @@ class vnode(objects.StructType):
 
             self._do_calc_path(ret, parent, parent_name)
 
+        elif int(vnodeobj.v_mount.mnt_vnodecovered) != 0:
+            self._do_calc_path(ret, vnodeobj.v_mount.mnt_vnodecovered, vnodeobj.v_mount.mnt_vnodecovered.v_name)
+
     def full_path(self):
         if self.v_flag & 0x000001 != 0 and self.v_mount != 0 and self.v_mount.mnt_flag & 0x00004000 != 0:
             ret = b"/"
         else:
             elements = []
-            files = []
-
             self._do_calc_path(elements, self, self.v_name)
             elements.reverse()
 
-            for e in elements:
-                files.append(e.encode("utf-8"))
-
+            files = [e.encode("utf-8") for e in elements]
             ret = b"/".join(files)
             if ret:
                 ret = b"/" + ret
@@ -187,41 +187,33 @@ class vm_map_entry(objects.StructType):
 
     def get_perms(self):
         permask = "rwx"
-        perms = ""
-
-        for (ctr, i) in enumerate([1, 3, 5]):
-            if (self.protection & i) == i:
-                perms = perms + permask[ctr]
-            else:
-                perms = perms + "-"
-
-        return perms
+        return "".join(
+            permask[ctr] if (self.protection & i) == i else "-"
+            for (ctr, i) in enumerate([1, 3, 5])
+        )
 
     def get_range_alias(self):
-        if self.has_member("alias"):
-            ret = int(self.alias)
-        else:
-            ret = int(self.vme_offset) & 0xfff
-
-        return ret
+        return (
+            int(self.alias)
+            if self.has_member("alias")
+            else int(self.vme_offset) & 0xFFF
+        )
 
     def get_special_path(self):
         check = self.get_range_alias()
 
         if 0 < check < 10:
-            ret = "[heap]"
+            return "[heap]"
         elif check == 30:
-            ret = "[stack]"
+            return "[stack]"
         else:
-            ret = ""
-
-        return ret
+            return ""
 
     def get_path(self, context, config_prefix):
         node = self.get_vnode(context, config_prefix)
 
         if type(node) == str and node == "sub_map":
-            ret = node
+            return node
         elif node:
             path = []
             seen: Set[int] = set()
@@ -240,11 +232,9 @@ class vm_map_entry(objects.StructType):
                 node = node.v_parent
 
             path.reverse()
-            ret = "/" + "/".join(path)
+            return "/" + "/".join(path)
         else:
-            ret = ""
-
-        return ret
+            return ""
 
     def get_object(self):
         if self.has_member("vme_object"):
@@ -295,21 +285,18 @@ class vm_map_entry(objects.StructType):
         except exceptions.InvalidAddressException:
             return None
 
-        found = False
-        for sym in context.symbol_space.get_symbols_by_location(ops.vol.offset):
-            if sym.split(constants.BANG)[1] in ["vnode_pager_ops", "_vnode_pager_ops"]:
-                found = True
-                break
+        found = any(
+            sym.split(constants.BANG)[1] in ["vnode_pager_ops", "_vnode_pager_ops"]
+            for sym in context.symbol_space.get_symbols_by_location(ops.vol.offset)
+        )
 
         if found:
             vpager = context.object(config_prefix + constants.BANG + "vnode_pager",
                                     layer_name = vnode_object.vol.native_layer_name,
                                     offset = vnode_object.pager)
-            ret = vpager.vnode_handle
+            return vpager.vnode_handle
         else:
-            ret = None
-
-        return ret
+            return None
 
 
 class socket(objects.StructType):
@@ -328,14 +315,12 @@ class socket(objects.StructType):
     def get_protocol_as_string(self):
         proto = self.so_proto.pr_protocol
 
-        if proto == 6:
-            ret = "TCP"
-        elif proto == 17:
-            ret = "UDP"
+        if proto == 17:
+            return "UDP"
+        elif proto == 6:
+            return "TCP"
         else:
-            ret = ""
-
-        return ret
+            return ""
 
     def get_state(self):
         ret = ""
@@ -351,23 +336,18 @@ class socket(objects.StructType):
         inpcb = self.get_inpcb()
 
         if inpcb is None:
-            ret = None
+            return None
         elif self.get_family() == 2:
-            ret = inpcb.get_ipv4_info()
+            return inpcb.get_ipv4_info()
         else:
-            ret = inpcb.get_ipv6_info()
-
-        return ret
+            return inpcb.get_ipv6_info()
 
     def get_converted_connection_info(self):
-        vals = self.get_connection_info()
-
-        if vals:
-            ret = conversion.convert_network_four_tuple(self.get_family(), vals)
-        else:
-            ret = None
-
-        return ret
+        return (
+            conversion.convert_network_four_tuple(self.get_family(), vals)
+            if (vals := self.get_connection_info())
+            else None
+        )
 
 
 class inpcb(objects.StructType):
@@ -382,12 +362,11 @@ class inpcb(objects.StructType):
             return ""
 
         state_type = tcpcb.t_state
-        if state_type and state_type < len(tcp_states):
-            state = tcp_states[state_type]
-        else:
-            state = ""
-
-        return state
+        return (
+            tcp_states[state_type]
+            if state_type and state_type < len(tcp_states)
+            else ""
+        )
 
     def get_ipv4_info(self):
         try:
@@ -467,7 +446,7 @@ class queue_entry(objects.StructType):
 
                     seen.add(n.vol.offset)
 
-                    yielded = yielded + 1
+                    yielded += 1
                     if yielded == max_size:
                         return
 
@@ -511,7 +490,7 @@ class sockaddr_dl(objects.StructType):
 
             e = e.cast("unsigned char")
 
-            ret = ret + f"{e:02X}:"
+            ret += f"{e:02X}:"
 
         if ret and ret[-1] == ":":
             ret = ret[:-1]
@@ -554,18 +533,12 @@ class sysctl_oid(objects.StructType):
                 W - writeable
                 L - self handles locking
         """
-        ret = ""
-
         checks = [0x80000000, 0x40000000, 0x00800000]
         perms = ["R", "W", "L"]
 
-        for (i, c) in enumerate(checks):
-            if c & self.oid_kind:
-                ret = ret + perms[i]
-            else:
-                ret = ret + "-"
-
-        return ret
+        return "".join(
+            perms[i] if c & self.oid_kind else "-" for (i, c) in enumerate(checks)
+        )
 
     def get_ctltype(self) -> str:
         """
@@ -588,12 +561,7 @@ class sysctl_oid(objects.StructType):
 
         ctltype = self.oid_kind & 0xf
 
-        if 0 < ctltype < 6:
-            ret = types[ctltype]
-        else:
-            ret = ""
-
-        return ret
+        return types[ctltype] if 0 < ctltype < 6 else ""
 
 
 class kauth_scope(objects.StructType):

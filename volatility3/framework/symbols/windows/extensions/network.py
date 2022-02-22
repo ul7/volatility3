@@ -79,18 +79,20 @@ class _TCP_LISTENER(objects.StructType):
             return None
 
     def get_owner_pid(self):
-        if self.get_owner().is_valid():
-            if self.get_owner().has_valid_member("UniqueProcessId"):
-                return self.get_owner().UniqueProcessId
+        if self.get_owner().is_valid() and self.get_owner().has_valid_member(
+            "UniqueProcessId"
+        ):
+            return self.get_owner().UniqueProcessId
 
         return None
 
     def get_owner_procname(self):
-        if self.get_owner().is_valid():
-            if self.get_owner().has_valid_member("ImageFileName"):
-                return self.get_owner().ImageFileName.cast("string",
-                                                           max_length = self.get_owner().ImageFileName.vol.count,
-                                                           errors = "replace")
+        if self.get_owner().is_valid() and self.get_owner().has_valid_member(
+            "ImageFileName"
+        ):
+            return self.get_owner().ImageFileName.cast("string",
+                                                       max_length = self.get_owner().ImageFileName.vol.count,
+                                                       errors = "replace")
 
         return None
 
@@ -122,30 +124,14 @@ class _TCP_LISTENER(objects.StructType):
             # if this causes no error, we can expect a valid network addr.
             _ = local_addr.pData.dereference().addr4[0]
 
-            if local_addr.pData.dereference():
-                inaddr = local_addr.inaddr
-                return inaddr
-            else:
-                return None
-
+            return local_addr.inaddr if local_addr.pData.dereference() else None
         except exceptions.InvalidAddressException:
             return None
 
     def dual_stack_sockets(self):
         """Handle Windows dual-stack sockets"""
 
-        # If this pointer is valid, the socket is bound to
-        # a specific IP address. Otherwise, the socket is
-        # listening on all IP addresses of the address family.
-
-        # Note the remote address is always INADDR_ANY or
-        # INADDR6_ANY for sockets. The moment a client
-        # connects to the listener, a TCP_ENDPOINT is created
-        # and that structure contains the remote address.
-
-        inaddr = self.get_in_addr()
-
-        if inaddr:
+        if inaddr := self.get_in_addr():
             if self.get_address_family() == AF_INET:
                 yield "v4", inet_ntop(socket.AF_INET, inaddr.addr4), inaddr_any
             elif self.get_address_family() == AF_INET6:
@@ -158,7 +144,7 @@ class _TCP_LISTENER(objects.StructType):
     def is_valid(self):
 
         try:
-            if not self.get_address_family() in (AF_INET, AF_INET6):
+            if self.get_address_family() not in (AF_INET, AF_INET6):
                 vollog.debug("netw obj 0x{:x} invalid due to invalid address_family {}".format(
                     self.vol.offset, self.get_address_family()))
                 return False

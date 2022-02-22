@@ -184,12 +184,13 @@ class HiveList(interfaces.plugins.PluginInterface):
                              "traversing forwards, this should not occur".format(hex(hive.vol.offset)))
                 break
             seen.add(hive.vol.offset)
-            if filter_string is None or filter_string.lower() in str(hive.get_name() or "").lower():
-                if context.layers[layer_name].is_valid(hive.vol.offset):
-                    yield hive
+            if (
+                filter_string is None
+                or filter_string.lower() in str(hive.get_name() or "").lower()
+            ) and context.layers[layer_name].is_valid(hive.vol.offset):
+                yield hive
 
-        forward_invalid = hg.invalid
-        if forward_invalid:
+        if forward_invalid := hg.invalid:
             vollog.debug("Hivelist failed traversing the list forwards at {}, traversing backwards".format(
                 hex(forward_invalid)))
             hg = HiveGenerator(cmhive, forward = False)
@@ -199,9 +200,11 @@ class HiveList(interfaces.plugins.PluginInterface):
                                  "traversing backwards, list walking met in the middle".format(hex(hive.vol.offset)))
                     break
                 seen.add(hive.vol.offset)
-                if filter_string is None or filter_string.lower() in str(hive.get_name() or "").lower():
-                    if context.layers[layer_name].is_valid(hive.vol.offset):
-                        yield hive
+                if (
+                    filter_string is None
+                    or filter_string.lower() in str(hive.get_name() or "").lower()
+                ) and context.layers[layer_name].is_valid(hive.vol.offset):
+                    yield hive
 
             backward_invalid = hg.invalid
 
@@ -228,10 +231,16 @@ class HiveList(interfaces.plugins.PluginInterface):
                                     if not linked_hive.is_valid() or linked_hive.vol.offset in seen:
                                         continue
                                     seen.add(linked_hive.vol.offset)
-                                    if filter_string is None or filter_string.lower() in str(linked_hive.get_name()
-                                                                                             or "").lower():
-                                        if context.layers[layer_name].is_valid(linked_hive.vol.offset):
-                                            yield linked_hive
+                                    if (
+                                        filter_string is None
+                                        or filter_string.lower()
+                                        in str(
+                                            linked_hive.get_name() or ""
+                                        ).lower()
+                                    ) and context.layers[layer_name].is_valid(
+                                        linked_hive.vol.offset
+                                    ):
+                                        yield linked_hive
                     except exceptions.InvalidAddressException:
                         vollog.debug("InvalidAddressException when traversing hive {} found from scan, skipping".format(
                             hex(hive.vol.offset)))

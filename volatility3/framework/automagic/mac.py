@@ -46,8 +46,7 @@ class MacIntelStacker(interfaces.automagic.StackerLayerInterface):
             dtb = None
             vollog.debug(f"Identified banner: {repr(banner)}")
 
-            symbol_files = mac_banners.get(banner, None)
-            if symbol_files:
+            if symbol_files := mac_banners.get(banner, None):
                 isf_path = symbol_files[0]
                 table_name = context.symbol_space.free_table_name('MacintelStacker')
                 table = mac.MacKernelIntermedSymbols(context = context,
@@ -143,7 +142,7 @@ class MacIntelStacker(interfaces.automagic.StackerLayerInterface):
         aslr_shift = 0
 
         for offset, banner in offset_generator:
-            banner_major, banner_minor = [int(x) for x in banner[22:].split(b".")[0:2]]
+            banner_major, banner_minor = [int(x) for x in banner[22:].split(b".")[:2]]
 
             tmp_aslr_shift = offset - cls.virtual_to_physical_address(version_json_address)
 
@@ -173,11 +172,7 @@ class MacIntelStacker(interfaces.automagic.StackerLayerInterface):
     def virtual_to_physical_address(cls, addr: int) -> int:
         """Converts a virtual mac address to a physical one (does not account
         of ASLR)"""
-        if addr > 0xffffff8000000000:
-            addr = addr - 0xffffff8000000000
-        else:
-            addr = addr - 0xff8000000000
-
+        addr -= 0xffffff8000000000 if addr > 0xffffff8000000000 else 0xff8000000000
         return addr
 
     @classmethod

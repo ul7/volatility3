@@ -47,11 +47,7 @@ class Callbacks(interfaces.plugins.PluginInterface):
         is_64bit = symbols.symbol_table_is_64bit(context, symbol_table)
         table_mapping = {"nt_symbols": symbol_table}
 
-        if is_64bit:
-            symbol_filename = "callbacks-x64"
-        else:
-            symbol_filename = "callbacks-x86"
-
+        symbol_filename = "callbacks-x64" if is_64bit else "callbacks-x86"
         return intermed.IntermediateSymbolTable.create(context,
                                                        config_path,
                                                        "windows",
@@ -264,9 +260,11 @@ class Callbacks(interfaces.plugins.PluginInterface):
                 else:
                     detail = callback_detail
 
-                module_symbols = list(collection.get_module_symbols_by_absolute_location(callback_address))
-
-                if module_symbols:
+                if module_symbols := list(
+                    collection.get_module_symbols_by_absolute_location(
+                        callback_address
+                    )
+                ):
                     for module_name, symbol_generator in module_symbols:
                         symbols_found = False
 

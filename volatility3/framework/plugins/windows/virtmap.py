@@ -93,7 +93,7 @@ class VirtMap(interfaces.plugins.PluginInterface):
                 region_range = result.get(entry, [])
                 region_range.append((start, cur_size))
                 result[entry] = region_range
-                start = start + cur_size
+                start += cur_size
                 cur_size = large_page_size
             else:
                 cur_size += large_page_size
@@ -106,8 +106,7 @@ class VirtMap(interfaces.plugins.PluginInterface):
         mapping = cls.determine_map(module)
         for entry in mapping:
             if 'Unused' not in entry:
-                for value in mapping[entry]:
-                    yield value
+                yield from mapping[entry]
 
     def run(self):
         kernel = self.context.modules[self.config['kernel']]

@@ -165,7 +165,7 @@ class UserAssist(interfaces.plugins.PluginInterface):
                 for subkey in countkey.get_subkeys():
 
                     subkey_name = subkey.get_name()
-                    result = (1, (
+                    yield (1, (
                         renderers.format_hints.Hex(hive.hive_offset),
                         hive_name,
                         countkey_path,
@@ -179,8 +179,6 @@ class UserAssist(interfaces.plugins.PluginInterface):
                         renderers.NotApplicableValue(),
                         renderers.NotApplicableValue(),
                     ))
-                    yield result
-
                 # output any values under Count
                 for value in countkey.get_values():
 
@@ -196,7 +194,7 @@ class UserAssist(interfaces.plugins.PluginInterface):
                             value_name = value_name.replace(guid, self._folder_guids[guid])
 
                     userassist_data_dict = self.parse_userassist_data(value)
-                    result = (1, (
+                    yield (1, (
                         renderers.format_hints.Hex(hive.hive_offset),
                         hive_name,
                         countkey_path,
@@ -210,7 +208,6 @@ class UserAssist(interfaces.plugins.PluginInterface):
                         userassist_data_dict["lastupdated"],
                         format_hints.HexBytes(userassist_data_dict["rawdata"]),
                     ))
-                    yield result
 
     def _generator(self):
 
@@ -238,13 +235,23 @@ class UserAssist(interfaces.plugins.PluginInterface):
                 vollog.debug("Key '{}' not found in Hive at offset {}.".format(
                     "software\\microsoft\\windows\\currentversion\\explorer\\userassist", hex(hive.hive_offset)))
 
-            # yield UnreadableValues when an exception occurs for a given hive_offset
-            result = (0, (renderers.format_hints.Hex(hive.hive_offset),
-                          hive.name if hive.name else renderers.UnreadableValue(), renderers.UnreadableValue(),
-                          renderers.UnreadableValue(), renderers.UnreadableValue(), renderers.UnreadableValue(),
-                          renderers.UnreadableValue(), renderers.UnreadableValue(), renderers.UnreadableValue(),
-                          renderers.UnreadableValue(), renderers.UnreadableValue(), renderers.UnreadableValue()))
-            yield result
+            yield (
+                0,
+                (
+                    renderers.format_hints.Hex(hive.hive_offset),
+                    hive.name or renderers.UnreadableValue(),
+                    renderers.UnreadableValue(),
+                    renderers.UnreadableValue(),
+                    renderers.UnreadableValue(),
+                    renderers.UnreadableValue(),
+                    renderers.UnreadableValue(),
+                    renderers.UnreadableValue(),
+                    renderers.UnreadableValue(),
+                    renderers.UnreadableValue(),
+                    renderers.UnreadableValue(),
+                    renderers.UnreadableValue(),
+                ),
+            )
 
     def run(self):
         self._reg_table_name = intermed.IntermediateSymbolTable.create(self.context, self._config_path, 'windows',

@@ -98,18 +98,14 @@ class MMVAD_SHORT(objects.StructType):
             return
 
         if target:
-            vad_object = self.cast(target)
-            yield vad_object
-
+            yield self.cast(target)
         try:
-            for vad_node in self.get_left_child().dereference().traverse(visited, depth + 1):
-                yield vad_node
+            yield from self.get_left_child().dereference().traverse(visited, depth + 1)
         except exceptions.InvalidAddressException as excp:
             vollog.log(constants.LOGLEVEL_VVV, f"Invalid address on LeftChild: {excp.invalid_address:#x}")
 
         try:
-            for vad_node in self.get_right_child().dereference().traverse(visited, depth + 1):
-                yield vad_node
+            yield from self.get_right_child().dereference().traverse(visited, depth + 1)
         except exceptions.InvalidAddressException as excp:
             vollog.log(constants.LOGLEVEL_VVV, f"Invalid address on RightChild: {excp.invalid_address:#x}")
 
@@ -281,11 +277,7 @@ class MMVAD_SHORT(objects.StructType):
         except IndexError:
             value = 0
 
-        names = []
-
-        for name, mask in winnt_protections.items():
-            if value & mask != 0:
-                names.append(name)
+        names = [name for name, mask in winnt_protections.items() if value & mask != 0]
 
         return "|".join(names)
 
@@ -446,10 +438,11 @@ class ETHREAD(objects.StructType):
         }
 
         flags = self.CrossThreadFlags
-        stringCrossThreadFlags = ''
-        for flag in dictCrossThreadFlags:
-            if flags & 2 ** dictCrossThreadFlags[flag]:
-                stringCrossThreadFlags += f'{flag} '
+        stringCrossThreadFlags = ''.join(
+            f'{flag} '
+            for flag, value in dictCrossThreadFlags.items()
+            if flags & 2 ** value
+        )
 
         return stringCrossThreadFlags[:-1] if stringCrossThreadFlags else stringCrossThreadFlags
 
@@ -481,7 +474,7 @@ class EPROCESS(generic.GenericIntelProcess, pool.ExecutiveObject):
                 return False
 
             # The System/PID 4 process has no create time
-            if not (str(name) == "System" and self.UniqueProcessId == 4):
+            if str(name) != "System" or self.UniqueProcessId != 4:
                 if self.CreateTime.QuadPart == 0:
                     return False
 
@@ -509,7 +502,7 @@ class EPROCESS(generic.GenericIntelProcess, pool.ExecutiveObject):
             if dtb & ~0xfff == 0:
                 return False
 
-            ## TODO: we can also add the thread Flink and Blink tests if necessary
+                ## TODO: we can also add the thread Flink and Blink tests if necessary
 
         except exceptions.InvalidAddressException:
             return False
@@ -554,20 +547,18 @@ class EPROCESS(generic.GenericIntelProcess, pool.ExecutiveObject):
                                                      f"Invalid address at {self.Peb:0x}")
 
         sym_table = self.vol.type_name.split(constants.BANG)[0]
-        peb = self._context.object(f"{sym_table}{constants.BANG}_PEB",
+        return self._context.object(f"{sym_table}{constants.BANG}_PEB",
                                    layer_name = proc_layer_name,
                                    offset = self.Peb)
-        return peb
 
     def load_order_modules(self) -> Iterable[interfaces.objects.ObjectInterface]:
         """Generator for DLLs in the order that they were loaded."""
 
         try:
             peb = self.get_peb()
-            for entry in peb.Ldr.InLoadOrderModuleList.to_list(
+            yield from peb.Ldr.InLoadOrderModuleList.to_list(
                     f"{self.get_symbol_table_name()}{constants.BANG}_LDR_DATA_TABLE_ENTRY",
-                    "InLoadOrderLinks"):
-                yield entry
+                    "InLoadOrderLinks")
         except exceptions.InvalidAddressException:
             return
 
@@ -576,10 +567,9 @@ class EPROCESS(generic.GenericIntelProcess, pool.ExecutiveObject):
 
         try:
             peb = self.get_peb()
-            for entry in peb.Ldr.InInitializationOrderModuleList.to_list(
+            yield from peb.Ldr.InInitializationOrderModuleList.to_list(
                     f"{self.get_symbol_table_name()}{constants.BANG}_LDR_DATA_TABLE_ENTRY",
-                    "InInitializationOrderLinks"):
-                yield entry
+                    "InInitializationOrderLinks")
         except exceptions.InvalidAddressException:
             return
 
@@ -588,18 +578,18 @@ class EPROCESS(generic.GenericIntelProcess, pool.ExecutiveObject):
 
         try:
             peb = self.get_peb()
-            for entry in peb.Ldr.InMemoryOrderModuleList.to_list(
+            yield from peb.Ldr.InMemoryOrderModuleList.to_list(
                     f"{self.get_symbol_table_name()}{constants.BANG}_LDR_DATA_TABLE_ENTRY",
-                    "InMemoryOrderLinks"):
-                yield entry
+                    "InMemoryOrderLinks")
         except exceptions.InvalidAddressException:
             return
 
     def get_handle_count(self):
         try:
-            if self.has_member("ObjectTable"):
-                if self.ObjectTable.has_member("HandleCount"):
-                    return self.ObjectTable.HandleCount
+            if self.has_member("ObjectTable") and self.ObjectTable.has_member(
+                "HandleCount"
+            ):
+                return self.ObjectTable.HandleCount
 
         except exceptions.InvalidAddressException:
             vollog.log(constants.LOGLEVEL_VVV,
@@ -716,10 +706,7 @@ class LIST_ENTRY(objects.StructType, collections.abc.Iterable):
 
         relative_offset = self._context.symbol_space.get_type(symbol_type).relative_child_offset(member)
 
-        direction = 'Blink'
-        if forward:
-            direction = 'Flink'
-
+        direction = 'Flink' if forward else 'Blink'
         trans_layer = self._context.layers[layer]
 
         try:
@@ -743,11 +730,12 @@ class LIST_ENTRY(objects.StructType, collections.abc.Iterable):
             except exceptions.InvalidAddressException:
                 return
 
-            obj = self._context.object(symbol_type,
-                                       layer,
-                                       offset = obj_offset,
-                                       native_layer_name = layer or self.vol.native_layer_name)
-            yield obj
+            yield self._context.object(
+                symbol_type,
+                layer,
+                offset=obj_offset,
+                native_layer_name=layer or self.vol.native_layer_name,
+            )
 
             seen.add(link.vol.offset)
 
@@ -766,34 +754,35 @@ class TOKEN(objects.StructType):
     def get_sids(self) -> Iterable[str]:
         """Yield a sid for the current token object."""
 
-        if self.UserAndGroupCount < 0xFFFF:
-            layer_name = self.vol.layer_name
-            kvo = self._context.layers[layer_name].config["kernel_virtual_offset"]
-            symbol_table = self.get_symbol_table_name()
-            ntkrnlmp = self._context.module(symbol_table, layer_name = layer_name, offset = kvo)
-            UserAndGroups = ntkrnlmp.object(object_type = "array",
-                                            offset = self.UserAndGroups.dereference().vol.get("offset") - kvo,
-                                            subtype = ntkrnlmp.get_type("_SID_AND_ATTRIBUTES"),
-                                            count = self.UserAndGroupCount)
-            for sid_and_attr in UserAndGroups:
-                try:
-                    sid = sid_and_attr.Sid.dereference().cast("_SID")
-                    # catch invalid pointers (UserAndGroupCount is too high)
-                    if sid is None:
-                        return
-                    # this mimics the windows API IsValidSid
-                    if sid.Revision & 0xF != 1 or sid.SubAuthorityCount > 15:
-                        return
-                    id_auth = ""
-                    for i in sid.IdentifierAuthority.Value:
-                        id_auth = i
-                    SubAuthority = ntkrnlmp.object(object_type = "array",
-                                                   offset = sid.SubAuthority.vol.offset - kvo,
-                                                   subtype = ntkrnlmp.get_type("unsigned long"),
-                                                   count = int(sid.SubAuthorityCount))
-                    yield "S-" + "-".join(str(i) for i in (sid.Revision, id_auth) + tuple(SubAuthority))
-                except exceptions.InvalidAddressException:
-                    vollog.log(constants.LOGLEVEL_VVVV, "InvalidAddressException while parsing for token sid")
+        if self.UserAndGroupCount >= 0xFFFF:
+            return
+        layer_name = self.vol.layer_name
+        kvo = self._context.layers[layer_name].config["kernel_virtual_offset"]
+        symbol_table = self.get_symbol_table_name()
+        ntkrnlmp = self._context.module(symbol_table, layer_name = layer_name, offset = kvo)
+        UserAndGroups = ntkrnlmp.object(object_type = "array",
+                                        offset = self.UserAndGroups.dereference().vol.get("offset") - kvo,
+                                        subtype = ntkrnlmp.get_type("_SID_AND_ATTRIBUTES"),
+                                        count = self.UserAndGroupCount)
+        for sid_and_attr in UserAndGroups:
+            try:
+                sid = sid_and_attr.Sid.dereference().cast("_SID")
+                # catch invalid pointers (UserAndGroupCount is too high)
+                if sid is None:
+                    return
+                # this mimics the windows API IsValidSid
+                if sid.Revision & 0xF != 1 or sid.SubAuthorityCount > 15:
+                    return
+                id_auth = ""
+                for i in sid.IdentifierAuthority.Value:
+                    id_auth = i
+                SubAuthority = ntkrnlmp.object(object_type = "array",
+                                               offset = sid.SubAuthority.vol.offset - kvo,
+                                               subtype = ntkrnlmp.get_type("unsigned long"),
+                                               count = int(sid.SubAuthorityCount))
+                yield "S-" + "-".join(str(i) for i in (sid.Revision, id_auth) + tuple(SubAuthority))
+            except exceptions.InvalidAddressException:
+                vollog.log(constants.LOGLEVEL_VVVV, "InvalidAddressException while parsing for token sid")
 
     def privileges(self):
         """Return a list of privileges for the current token object."""
@@ -1053,7 +1042,7 @@ class SHARED_CACHE_MAP(objects.StructType):
                                           subtype = pointer_type)
 
         # Iterate through the entries
-        for counter in range(0, self.VACB_ARRAY):
+        for counter in range(self.VACB_ARRAY):
             # Check if the VACB entry is in use
             if not vacb_array[counter]:
                 continue
@@ -1088,7 +1077,7 @@ class SHARED_CACHE_MAP(objects.StructType):
         # are mapped in the cache. For example, the first entry in the VACB index array refers to the first
         # 256 KB of the file. The InitialVacbs can describe a file up to 1 MB (4xVACB).
         iterval = 0
-        while (iterval < full_blocks) and (full_blocks <= 4):
+        while iterval < full_blocks <= 4:
             vacb_obj = self.InitialVacbs[iterval]
             try:
                 # Make sure that the SharedCacheMap member of the VACB points back to the parent object.
@@ -1127,7 +1116,7 @@ class SHARED_CACHE_MAP(objects.StructType):
 
         if not section_size > self.VACB_SIZE_OF_FIRST_LEVEL:
             array_head = vacb_obj
-            for counter in range(0, full_blocks):
+            for counter in range(full_blocks):
                 vacb_entry = self._context.object(symbol_table_name + constants.BANG + "pointer",
                                                   layer_name = self.vol.layer_name,
                                                   offset = array_head + (counter * size_of_pointer))
@@ -1177,7 +1166,7 @@ class SHARED_CACHE_MAP(objects.StructType):
 
             # Walk the array and if any entry points to the shared cache map object then we extract it.
             # Otherwise, if it is non-zero, then traverse to the next level.
-            for counter in range(0, self.VACB_ARRAY):
+            for counter in range(self.VACB_ARRAY):
                 if not vacb_array[counter]:
                     continue
 

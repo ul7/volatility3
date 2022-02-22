@@ -182,10 +182,11 @@ class Intel(linear.LinearlyMappedLayer):
         address."""
         try:
             # TODO: Consider reimplementing this, since calls to mapping can call is_valid
-            return all([
+            return all(
                 self._context.layers[layer].is_valid(mapped_offset)
                 for _, _, mapped_offset, _, layer in self.mapping(offset, length)
-            ])
+            )
+
         except exceptions.InvalidAddressException:
             return False
 
@@ -335,9 +336,12 @@ class WindowsMixin(Intel):
                 swap_offset = entry >> bit_offset << excp.invalid_bits
 
                 if layer.config.get('swap_layers', False):
-                    swap_layer_name = layer.config.get(
-                        interfaces.configuration.path_join('swap_layers', 'swap_layers' + str(n)), None)
-                    if swap_layer_name:
+                    if swap_layer_name := layer.config.get(
+                        interfaces.configuration.path_join(
+                            'swap_layers', 'swap_layers' + str(n)
+                        ),
+                        None,
+                    ):
                         return swap_offset, 1 << excp.invalid_bits, swap_layer_name
                 raise exceptions.SwappedInvalidAddressException(layer_name = excp.layer_name,
                                                                 invalid_address = excp.invalid_address,

@@ -39,8 +39,14 @@ class BannerCacheGenerator:
             for extension in constants.ISF_EXTENSIONS:
                 # Hopefully these will not be large lists, otherwise this might be slow
                 try:
-                    for found in pathlib.Path(path).joinpath(sub_path).resolve().rglob(filename + extension):
-                        potentials.append(found.as_uri())
+                    potentials.extend(
+                        found.as_uri()
+                        for found in pathlib.Path(path)
+                        .joinpath(sub_path)
+                        .resolve()
+                        .rglob(filename + extension)
+                    )
+
                 except FileNotFoundError:
                     # If there's no linux symbols, don't cry about it
                     pass

@@ -16,7 +16,7 @@ vollog = logging.getLogger(__name__)
 try:
     import yara
 
-    if tuple([int(x) for x in yara.__version__.split('.')]) < (3, 8):
+    if tuple(int(x) for x in yara.__version__.split('.')) < (3, 8):
         raise ImportError
 except ImportError:
     vollog.info("Python Yara (>3.8.0) module not found, plugin (and dependent plugins) not available")

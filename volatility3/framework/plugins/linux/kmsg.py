@@ -145,8 +145,7 @@ class ABCKmsg(ABC):
 
     def get_caller_text(self, caller_id):
         caller_name = 'CPU' if caller_id & 0x80000000 else 'Task'
-        caller = "%s(%u)" % (caller_name, caller_id & ~0x80000000)
-        return caller
+        return "%s(%u)" % (caller_name, caller_id & ~0x80000000)
 
     def get_prefix(self, obj) -> Tuple[int, int, str, str]:
         # obj could be printk_log or printk_info
@@ -156,17 +155,15 @@ class ABCKmsg(ABC):
     def get_level_text(cls, level: int) -> str:
         if level < len(cls.LEVELS):
             return cls.LEVELS[level]
-        else:
-            vollog.debug(f"Level {level} unknown")
-            return str(level)
+        vollog.debug(f"Level {level} unknown")
+        return str(level)
 
     @classmethod
     def get_facility_text(cls, facility: int) -> str:
         if facility < len(cls.FACILITIES):
             return cls.FACILITIES[facility]
-        else:
-            vollog.debug(f"Facility {facility} unknown")
-            return str(facility)
+        vollog.debug(f"Facility {facility} unknown")
+        return str(facility)
 
 
 class KmsgLegacy(ABCKmsg):
@@ -202,15 +199,15 @@ class KmsgLegacy(ABCKmsg):
         dict_offset = msg.vol.offset + self.vmlinux.get_type('printk_log').size + msg.text_len
         dict_data = self._context.layers[self.layer_name].read(dict_offset, msg.dict_len)
         for chunk in dict_data.split(b'\x00'):
-            yield " " + chunk.decode()
+            yield f' {chunk.decode()}'
 
     def run(self) -> Iterator[Tuple[str, str, str, str, str]]:
         log_buf_ptr = self.vmlinux.object_from_symbol(symbol_name = 'log_buf')
         if log_buf_ptr == 0:
             # This is weird, let's fallback to check the static ringbuffer.
             log_buf_ptr = self.vmlinux.object_from_symbol(symbol_name = '__log_buf').vol.offset
-            if log_buf_ptr == 0:
-                raise ValueError("Log buffer is not available")
+        if log_buf_ptr == 0:
+            raise ValueError("Log buffer is not available")
 
         log_first_idx = int(self.vmlinux.object_from_symbol(symbol_name = 'log_first_idx'))
         cur_idx = log_first_idx
@@ -317,12 +314,10 @@ class KmsgFiveTen(ABCKmsg):
         yield from text.splitlines()
 
     def get_dict_lines(self, info) -> Generator[str, None, None]:
-        dict_text = utility.array_to_string(info.dev_info.subsystem)
-        if dict_text:
+        if dict_text := utility.array_to_string(info.dev_info.subsystem):
             yield f" SUBSYSTEM={dict_text}"
 
-        dict_text = utility.array_to_string(info.dev_info.device)
-        if dict_text:
+        if dict_text := utility.array_to_string(info.dev_info.device):
             yield f" DEVICE={dict_text}"
 
     def run(self) -> Iterator[Tuple[str, str, str, str, str]]:

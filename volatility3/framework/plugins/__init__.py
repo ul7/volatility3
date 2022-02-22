@@ -39,11 +39,9 @@ def construct_plugin(context: interfaces.context.ContextInterface,
     # Plugins always get their configuration stored under their plugin name
     plugin_config_path = interfaces.configuration.path_join(base_config_path, plugin.__name__)
 
-    # Check all the requirements and/or go back to the automagic step
-    unsatisfied = plugin.unsatisfied(context, plugin_config_path)
-    if unsatisfied:
+    if unsatisfied := plugin.unsatisfied(context, plugin_config_path):
         for error in errors:
-            error_string = [x for x in error.format_exception_only()][-1]
+            error_string = list(error.format_exception_only())[-1]
             vollog.warning(f"Automagic exception occurred: {error_string[:-1]}")
             vollog.log(constants.LOGLEVEL_V, "".join(error.format(chain = True)))
         raise exceptions.UnsatisfiedException(unsatisfied)

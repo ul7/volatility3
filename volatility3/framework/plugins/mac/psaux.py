@@ -65,7 +65,7 @@ class Psaux(plugins.PluginInterface):
                 argsstart += len(str(arg)) + 1
 
                 # deal with the stupid alignment (leading nulls) and arg duplication
-                if len(args) == 0:
+                if not args:
                     while argsstart < task.user_stack:
                         try:
                             check = proc_layer.read(argsstart, 1)
@@ -79,7 +79,6 @@ class Psaux(plugins.PluginInterface):
 
                     args.append(arg)
 
-                # also check for initial duplicates since OS X is painful
                 elif arg != args[0]:
                     args.append(arg)
 

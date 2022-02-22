@@ -107,10 +107,7 @@ if HAS_LEECHCORE:
             be extremely inefficient borderline impossible to do consistently"""
             data = self.handle.read(self._cursor, size, True)
 
-            if len(data) > size:
-                data = data[:size]
-            else:
-                data = data + b'\x00' * (size - len(data))
+            data = data[:size] if len(data) > size else data + b'\x00' * (size - len(data))
             self._cursor += len(data)
             if not len(data):
                 raise exceptions.InvalidAddressException('LeechCore layer read failure', self._cursor + len(data))

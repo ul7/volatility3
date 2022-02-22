@@ -70,8 +70,7 @@ class Envars(interfaces.plugins.PluginInterface):
                 try:
                     for node in key.get_values():
                         try:
-                            value_node_name = node.get_name()
-                            if value_node_name:
+                            if value_node_name := node.get_name():
                                 values.append(value_node_name)
                         except (exceptions.InvalidAddressException, registry.RegistryFormatException) as excp:
                             vollog.log(
@@ -91,8 +90,7 @@ class Envars(interfaces.plugins.PluginInterface):
                 try:
                     for node in key.get_values():
                         try:
-                            value_node_name = node.get_name()
-                            if value_node_name:
+                            if value_node_name := node.get_name():
                                 values.append(value_node_name)
                         except (exceptions.InvalidAddressException, registry.RegistryFormatException) as excp:
                             vollog.log(
@@ -110,8 +108,7 @@ class Envars(interfaces.plugins.PluginInterface):
             try:
                 for node in key.get_values():
                     try:
-                        value_node_name = node.get_name()
-                        if value_node_name:
+                        if value_node_name := node.get_name():
                             values.append(value_node_name)
                     except (exceptions.InvalidAddressException, registry.RegistryFormatException) as excp:
                         vollog.log(
@@ -182,9 +179,8 @@ class Envars(interfaces.plugins.PluginInterface):
 
         for task in data:
             for var, val in task.environment_variables():
-                if self.config.get('silent', None):
-                    if var in silent_vars:
-                        continue
+                if self.config.get('silent', None) and var in silent_vars:
+                    continue
                 yield (0, (int(task.UniqueProcessId), str(objects.utility.array_to_string(task.ImageFileName)),
                            hex(task.get_peb().ProcessParameters.Environment.vol.offset), str(var), str(val)))
 

@@ -134,11 +134,14 @@ class Modules(interfaces.plugins.PluginInterface):
             Layer name or None if no layers that contain the base address can be found
         """
 
-        for layer_name in session_layers:
-            if context.layers[layer_name].is_valid(base_address):
-                return layer_name
-
-        return None
+        return next(
+            (
+                layer_name
+                for layer_name in session_layers
+                if context.layers[layer_name].is_valid(base_address)
+            ),
+            None,
+        )
 
     @classmethod
     def list_modules(cls, context: interfaces.context.ContextInterface, layer_name: str,
@@ -170,8 +173,7 @@ class Modules(interfaces.plugins.PluginInterface):
         reloff = ldr_entry_type.relative_child_offset("InLoadOrderLinks")
         module = ntkrnlmp.object(object_type = type_name, offset = list_entry.vol.offset - reloff, absolute = True)
 
-        for mod in module.InLoadOrderLinks:
-            yield mod
+        yield from module.InLoadOrderLinks
 
     def run(self):
         return renderers.TreeGrid([("Offset", format_hints.Hex), ("Base", format_hints.Hex), ("Size", format_hints.Hex),

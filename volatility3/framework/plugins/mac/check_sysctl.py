@@ -70,7 +70,7 @@ class Check_sysctl(plugins.PluginInterface):
             except exceptions.InvalidAddressException:
                 name = ""
 
-            if len(name) == 0:
+            if not name:
                 break
 
             ctltype = sysctl.get_ctltype()
@@ -86,9 +86,7 @@ class Check_sysctl(plugins.PluginInterface):
                 val = self._parse_global_variable_sysctls(kernel, name)
             elif ctltype == 'CTLTYPE_NODE':
                 if sysctl.oid_handler == 0:
-                    for info in self._process_sysctl_list(kernel, sysctl.oid_arg1, recursive = 1):
-                        yield info
-
+                    yield from self._process_sysctl_list(kernel, sysctl.oid_arg1, recursive = 1)
                 val = "Node"
 
             elif ctltype in ['CTLTYPE_INT', 'CTLTYPE_QUAD', 'CTLTYPE_OPAQUE']:

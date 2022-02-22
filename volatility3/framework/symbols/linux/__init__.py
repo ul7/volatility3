@@ -57,7 +57,7 @@ class LinuxUtilities(interfaces.configuration.VersionableInterface):
                 break
 
             ret_path.insert(0, dname.strip('/'))
-            if dentry == vfsmnt.get_mnt_root() or dentry == dentry.d_parent:
+            if dentry in [vfsmnt.get_mnt_root(), dentry.d_parent]:
                 if vfsmnt.get_mnt_parent() == vfsmnt:
                     break
 
@@ -86,12 +86,12 @@ class LinuxUtilities(interfaces.configuration.VersionableInterface):
                 except exceptions.InvalidAddressException:
                     ino = 0
 
-                ret_val = ret_val[:-1] + f":[{ino}]"
+                ret_val = f'{ret_val[:-1]}:[{ino}]'
             else:
                 ret_val = ret_val.replace("/", "")
 
         elif ret_val != "inotify":
-            ret_val = '/' + ret_val
+            ret_val = f'/{ret_val}'
 
         return ret_val
 
@@ -113,10 +113,7 @@ class LinuxUtilities(interfaces.configuration.VersionableInterface):
         sym_addr = dentry.d_op.d_dname
 
         symbol_table_arr = sym_addr.vol.type_name.split("!")
-        symbol_table = None
-        if len(symbol_table_arr) == 2:
-            symbol_table = symbol_table_arr[0]
-
+        symbol_table = symbol_table_arr[0] if len(symbol_table_arr) == 2 else None
         for module_name in context.modules.get_modules_by_symbol_tables(symbol_table):
             kernel_module = context.modules[module_name]
             break
@@ -125,30 +122,27 @@ class LinuxUtilities(interfaces.configuration.VersionableInterface):
 
         symbs = list(kernel_module.get_symbols_by_absolute_location(sym_addr))
 
-        if len(symbs) == 1:
-            sym = symbs[0].split(constants.BANG)[1]
+        if len(symbs) != 1:
+            return f"<invalid d_dname pointer> {sym_addr:x}"
 
-            if sym == "sockfs_dname":
-                pre_name = "socket"
+        sym = symbs[0].split(constants.BANG)[1]
 
-            elif sym == "anon_inodefs_dname":
-                pre_name = "anon_inode"
+        if sym == "sockfs_dname":
+            pre_name = "socket"
 
-            elif sym == "pipefs_dname":
-                pre_name = "pipe"
+        elif sym == "anon_inodefs_dname":
+            pre_name = "anon_inode"
 
-            elif sym == "simple_dname":
-                pre_name = cls._get_path_file(task, filp)
+        elif sym == "pipefs_dname":
+            pre_name = "pipe"
 
-            else:
-                pre_name = f"<unsupported d_op symbol: {sym}>"
-
-            ret = f"{pre_name}:[{dentry.d_inode.i_ino:d}]"
+        elif sym == "simple_dname":
+            pre_name = cls._get_path_file(task, filp)
 
         else:
-            ret = f"<invalid d_dname pointer> {sym_addr:x}"
+            pre_name = f"<unsupported d_op symbol: {sym}>"
 
-        return ret
+        return f"{pre_name}:[{dentry.d_inode.i_ino:d}]"
 
     # a 'file' structure doesn't have enough information to properly restore its full path
     # we need the root mount information from task_struct to determine this
@@ -172,12 +166,11 @@ class LinuxUtilities(interfaces.configuration.VersionableInterface):
         except exceptions.InvalidAddressException:
             dname_is_valid = False
 
-        if dname_is_valid:
-            ret = LinuxUtilities._get_new_sock_pipe_path(context, task, filp)
-        else:
-            ret = LinuxUtilities._get_path_file(task, filp)
-
-        return ret
+        return (
+            LinuxUtilities._get_new_sock_pipe_path(context, task, filp)
+            if dname_is_valid
+            else LinuxUtilities._get_path_file(task, filp)
+        )
 
     @classmethod
     def files_descriptors_for_process(cls, context: interfaces.context.ContextInterface, symbol_table: str,
@@ -250,7 +243,7 @@ class LinuxUtilities(interfaces.configuration.VersionableInterface):
         for name, start, end in handlers:
             if start <= target_address <= end:
                 mod_name = name
-                if name == constants.linux.KERNEL_NAME:
+                if mod_name == constants.linux.KERNEL_NAME:
                     symbols = list(kernel_module.get_symbols_by_absolute_location(target_address))
 
                     if len(symbols):

@@ -101,11 +101,11 @@ class RegistryHive(linear.LinearlyMappedLayer):
 
     def get_cell(self, cell_offset: int) -> 'objects.StructType':
         """Returns the appropriate Cell value for a cell offset."""
-        # This would be an _HCELL containing CELL_DATA, but to save time we skip the size of the HCELL
-        cell = self._context.object(object_type = self._table_name + constants.BANG + "_CELL_DATA",
-                                    offset = cell_offset + 4,
-                                    layer_name = self.name)
-        return cell
+        return self._context.object(
+            object_type=self._table_name + constants.BANG + "_CELL_DATA",
+            offset=cell_offset + 4,
+            layer_name=self.name,
+        )
 
     def get_node(self, cell_offset: int) -> 'objects.StructType':
         """Returns the appropriate Node, interpreted from the Cell based on its
@@ -121,7 +121,7 @@ class RegistryHive(linear.LinearlyMappedLayer):
         elif signature == 'db':
             # Big Data
             return cell.u.ValueData
-        elif signature == 'lf' or signature == 'lh' or signature == 'ri':
+        elif signature in ['lf', 'lh', 'ri']:
             # Fast Leaf, Hash Leaf, Index Root
             return cell.u.KeyIndex
         else:
@@ -138,8 +138,7 @@ class RegistryHive(linear.LinearlyMappedLayer):
         (if return_list is true).
         """
         node_key = [self.get_node(self.root_cell_offset)]
-        if key.endswith("\\"):
-            key = key[:-1]
+        key = key.removesuffix("\\")
         key_array = key.split('\\')
         found_key: List[str] = []
         while key_array and node_key:
@@ -148,7 +147,7 @@ class RegistryHive(linear.LinearlyMappedLayer):
                 # registry keys are not case sensitive so compare lowercase
                 # https://msdn.microsoft.com/en-us/library/windows/desktop/ms724946(v=vs.85).aspx
                 if subkey.get_name().lower() == key_array[0].lower():
-                    node_key = node_key + [subkey]
+                    node_key += [subkey]
                     found_key, key_array = found_key + [key_array[0]], key_array[1:]
                     break
             else:
@@ -254,10 +253,11 @@ class RegistryHive(linear.LinearlyMappedLayer):
         """Returns a boolean based on whether the offset is valid or not."""
         try:
             # Pass this to the lower layers for now
-            return all([
+            return all(
                 self.context.layers[layer].is_valid(offset, length)
                 for (_, _, offset, length, layer) in self.mapping(offset, length)
-            ])
+            )
+
         except exceptions.InvalidAddressException:
             return False
 

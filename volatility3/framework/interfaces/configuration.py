@@ -41,7 +41,7 @@ ConfigSimpleType = Optional[Union[SimpleTypes, List[SimpleTypes]]]
 def path_join(*args) -> str:
     """Joins configuration paths together."""
     # If a path element (particularly the first) is empty, then remove it from the list
-    args = tuple([arg for arg in args if arg])
+    args = tuple(arg for arg in args if arg)
     return CONFIG_SEPARATOR.join(args)
 
 
@@ -108,17 +108,12 @@ class HierarchicalDict(collections.abc.Mapping):
     def _key_head(self, key: str) -> str:
         """Returns the first division of a key based on the dict separator, or
         the full key if the separator is not present."""
-        if self.separator in key:
-            return key[:key.index(self.separator)]
-        else:
-            return key
+        return key[:key.index(self.separator)] if self.separator in key else key
 
     def _key_tail(self, key: str) -> str:
         """Returns all but the first division of a key based on the dict
         separator, or None if the separator is not in the key."""
-        if self.separator in key:
-            return key[key.index(self.separator) + 1:]
-        return ''
+        return key[key.index(self.separator) + 1:] if self.separator in key else ''
 
     def __iter__(self) -> Iterator[Any]:
         """Returns an iterator object that supports the iterator protocol."""
@@ -131,8 +126,7 @@ class HierarchicalDict(collections.abc.Mapping):
         Returns:
             Returns each item in the top level data, and then all subkeys in a depth first order
         """
-        for key in self._data:
-            yield key
+        yield from self._data
         for subdict_key in self._subdict:
             for key in self._subdict[subdict_key]:
                 yield subdict_key + self.separator + key
@@ -141,11 +135,10 @@ class HierarchicalDict(collections.abc.Mapping):
         """Gets an item, traversing down the trees to get to the final
         value."""
         try:
-            if self.separator in key:
-                subdict = self._subdict[self._key_head(key)]
-                return subdict[self._key_tail(key)]
-            else:
+            if self.separator not in key:
                 return self._data[key]
+            subdict = self._subdict[self._key_head(key)]
+            return subdict[self._key_tail(key)]
         except KeyError:
             raise KeyError(key)
 
@@ -159,15 +152,14 @@ class HierarchicalDict(collections.abc.Mapping):
             subdict = self._subdict.get(self._key_head(key), HierarchicalDict(separator = self.separator))
             subdict._setitem(self._key_tail(key), value, is_data)
             self._subdict[self._key_head(key)] = subdict
+        elif is_data:
+            self._data[key] = self._sanitize_value(value)
+        elif not isinstance(value, HierarchicalDict):
+            raise TypeError(
+                "HierarchicalDicts can only store HierarchicalDicts within their structure: {}".format(
+                    type(value)))
         else:
-            if is_data:
-                self._data[key] = self._sanitize_value(value)
-            else:
-                if not isinstance(value, HierarchicalDict):
-                    raise TypeError(
-                        "HierarchicalDicts can only store HierarchicalDicts within their structure: {}".format(
-                            type(value)))
-                self._subdict[key] = value
+            self._subdict[key] = value
 
     def _sanitize_value(self, value: Any) -> ConfigSimpleType:
         """Method to ensure all values are standard values and not volatility
@@ -207,18 +199,17 @@ class HierarchicalDict(collections.abc.Mapping):
 
     def __contains__(self, key: Any) -> bool:
         """Determines whether the key is present in the hierarchy."""
-        if self.separator in key:
-            try:
-                subdict = self._subdict[self._key_head(key)]
-                return self._key_tail(key) in subdict
-            except KeyError:
-                return False
-        else:
+        if self.separator not in key:
             return key in self._data
+        try:
+            subdict = self._subdict[self._key_head(key)]
+            return self._key_tail(key) in subdict
+        except KeyError:
+            return False
 
     def __len__(self) -> int:
         """Returns the length of all items."""
-        return len(self._data) + sum([len(subdict) for subdict in self._subdict])
+        return len(self._data) + sum(len(subdict) for subdict in self._subdict)
 
     def branch(self, key: str) -> 'HierarchicalDict':
         """Returns the HierarchicalDict housed under the key.
@@ -268,10 +259,10 @@ class HierarchicalDict(collections.abc.Mapping):
         if not isinstance(key, str) or not isinstance(value, HierarchicalDict):
             raise TypeError("Splice requires a string key and HierarchicalDict value")
         for item in dict(value):
-            if self.get(key + self._separator + item, None) is not None:
-                if overwrite:
-                    self[key + self._separator + item] = value[item]
-            else:
+            if self.get(key + self._separator + item, None) is None:
+                self[key + self._separator + item] = value[item]
+
+            elif overwrite:
                 self[key + self._separator + item] = value[item]
 
     def clone(self) -> 'HierarchicalDict':
@@ -323,15 +314,15 @@ class RequirementInterface(metaclass = ABCMeta):
         self._requirements: Dict[str, RequirementInterface] = {}
 
     def __repr__(self) -> str:
-        return "<" + self.__class__.__name__ + ": " + self.name + ">"
+        return f'<{self.__class__.__name__}: {self.name}>'
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
-        for name in self.__dict__:
-            if other.__dict__.get(name, None) != self.__dict__[name]:
-                return False
-        return True
+        return all(
+            other.__dict__.get(name, None) == self.__dict__[name]
+            for name in self.__dict__
+        )
 
     @property
     def name(self) -> str:
@@ -503,9 +494,8 @@ class ClassRequirement(RequirementInterface):
                 class_name = value[value.rindex(".") + 1:]
                 if hasattr(module, class_name):
                     self._cls = getattr(module, class_name)
-            else:
-                if value in globals():
-                    self._cls = globals()[value]
+            elif value in globals():
+                self._cls = globals()[value]
         if self._cls is None:
             return {config_path: self}
         return {}
@@ -557,17 +547,19 @@ class ConstructableRequirementInterface(RequirementInterface):
         """
         class_req = self.requirements['class']
         subreq_config_path = path_join(config_path, self.name)
-        if not class_req.unsatisfied(context, subreq_config_path) and isinstance(class_req, ClassRequirement):
-            # We have a class, and since it's validated we can construct our requirements from it
-            if issubclass(class_req.cls, ConfigurableInterface):
-                # In case the class has changed, clear out the old requirements
-                for old_req in self._current_class_requirements.copy():
-                    del self._requirements[old_req]
-                    self._current_class_requirements.remove(old_req)
-                # And add the new ones
-                for requirement in class_req.cls.get_requirements():
-                    self._current_class_requirements.add(requirement.name)
-                    self.add_requirement(requirement)
+        if (
+            not class_req.unsatisfied(context, subreq_config_path)
+            and isinstance(class_req, ClassRequirement)
+            and issubclass(class_req.cls, ConfigurableInterface)
+        ):
+            # In case the class has changed, clear out the old requirements
+            for old_req in self._current_class_requirements.copy():
+                del self._requirements[old_req]
+                self._current_class_requirements.remove(old_req)
+            # And add the new ones
+            for requirement in class_req.cls.get_requirements():
+                self._current_class_requirements.add(requirement.name)
+                self.add_requirement(requirement)
 
     def _construct_class(self,
                          context: 'interfaces.context.ContextInterface',
@@ -662,9 +654,11 @@ class ConfigurableInterface(metaclass = ABCMeta):
             # Do not include the name of constructed classes
             if value is not None and not isinstance(req, ConstructableRequirementInterface):
                 result[req.name] = value
-            if isinstance(req, ConfigurableRequirementInterface):
-                if value is not None:
-                    result.splice(req.name, req.build_configuration(self.context, self.config_path, value))
+            if (
+                isinstance(req, ConfigurableRequirementInterface)
+                and value is not None
+            ):
+                result.splice(req.name, req.build_configuration(self.context, self.config_path, value))
         return result
 
     @classmethod

@@ -40,9 +40,6 @@ class VFSevents(interfaces.plugins.PluginInterface):
 
             task_name = utility.array_to_string(watcher.proc_name)
             task_pid = watcher.pid
-
-            events = []
-
             try:
                 event_array = kernel.object(object_type = "array",
                                             offset = watcher.event_list,
@@ -53,9 +50,11 @@ class VFSevents(interfaces.plugins.PluginInterface):
             except exceptions.InvalidAddressException:
                 continue
 
-            for i, event in enumerate(event_array):
-                if event == 1:
-                    events.append(self.event_types[i])
+            events = [
+                self.event_types[i]
+                for i, event in enumerate(event_array)
+                if event == 1
+            ]
 
             if events != []:
                 yield (0, (task_name, task_pid, ",".join(events)))

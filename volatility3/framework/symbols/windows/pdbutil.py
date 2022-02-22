@@ -70,7 +70,7 @@ class PDBUtility(interfaces.configuration.VersionableInterface):
                                   progress_callback: constants.ProgressCallback = None):
         """Loads (downloading if necessary) a windows symbol table"""
 
-        filter_string = os.path.join(pdb_name.strip('\x00'), guid.upper() + "-" + str(age))
+        filter_string = os.path.join(pdb_name.strip('\x00'), f'{guid.upper()}-{age}')
 
         isf_path = None
         # Take the first result of search for the intermediate file
@@ -191,7 +191,7 @@ class PDBUtility(interfaces.configuration.VersionableInterface):
         """Attempts to download the PDB file, convert it to an ISF file and
         save it to one of the symbol locations."""
         # Check for writability
-        filter_string = os.path.join(pdb_name, guid + "-" + str(age))
+        filter_string = os.path.join(pdb_name, f'{guid}-{age}')
         for path in symbols.__path__:
 
             # Store any temporary files created by downloading PDB files
@@ -201,11 +201,11 @@ class PDBUtility(interfaces.configuration.VersionableInterface):
             try:
                 os.makedirs(os.path.dirname(potential_output_filename), exist_ok = True)
                 with lzma.open(potential_output_filename, "w") as of:
-                    # Once we haven't thrown an error, do the computation
-                    filename = pdbconv.PdbRetreiver().retreive_pdb(guid + str(age),
-                                                                   file_name = pdb_name,
-                                                                   progress_callback = progress_callback)
-                    if filename:
+                    if filename := pdbconv.PdbRetreiver().retreive_pdb(
+                        guid + str(age),
+                        file_name=pdb_name,
+                        progress_callback=progress_callback,
+                    ):
                         url = parse.urlparse(filename, scheme = 'file')
                         if url.scheme == 'file' or len(url.scheme) == 1:
                             tmp_files.append(filename)

@@ -97,10 +97,10 @@ class Handles(interfaces.plugins.PluginInterface):
                             "capstone", "Requires capstone to find the SAR value for decoding handle table pointers")
 
                 offset = self._decode_pointer(handle_table_entry.LowValue, magic)
-            else:
-                if handle_table_entry.InfoTable == 0:
-                    return None
+            elif handle_table_entry.InfoTable == 0:
+                return None
 
+            else:
                 offset = handle_table_entry.InfoTable & ~7
 
             # print("LowValue: {0:#x} Magic: {1:#x} Offset: {2:#x}".format(handle_table_entry.InfoTable, magic, offset))
@@ -236,11 +236,9 @@ class Handles(interfaces.plugins.PluginInterface):
 
         if level > 0:
             subtype = ntkrnlmp.get_type("pointer")
-            count = 0x1000 / subtype.size
         else:
             subtype = ntkrnlmp.get_type("_HANDLE_TABLE_ENTRY")
-            count = 0x1000 / subtype.size
-
+        count = 0x1000 / subtype.size
         if not self.context.layers[virtual].is_valid(offset):
             return
 
@@ -256,8 +254,7 @@ class Handles(interfaces.plugins.PluginInterface):
         for entry in table:
 
             if level > 0:
-                for x in self._make_handle_array(entry, level - 1, depth):
-                    yield x
+                yield from self._make_handle_array(entry, level - 1, depth)
                 depth += 1
             else:
                 handle_multiplier = 4
@@ -289,8 +286,7 @@ class Handles(interfaces.plugins.PluginInterface):
             vollog.log(constants.LOGLEVEL_VVV, "Handle table parsing was aborted due to an invalid address exception")
             return
 
-        for handle_table_entry in self._make_handle_array(TableCode, table_levels):
-            yield handle_table_entry
+        yield from self._make_handle_array(TableCode, table_levels)
 
     def _generator(self, procs):
         kernel = self.context.modules[self.config['kernel']]
