@@ -53,9 +53,7 @@ class PsList(interfaces.plugins.PluginInterface):
                                     self.config['kernel'],
                                     filter_func = self.create_pid_filter(self.config.get('pid', None))):
             pid = task.pid
-            ppid = 0
-            if task.parent:
-                ppid = task.parent.pid
+            ppid = task.parent.pid if task.parent else 0
             name = utility.array_to_string(task.comm)
             yield (0, (pid, ppid, name))
 

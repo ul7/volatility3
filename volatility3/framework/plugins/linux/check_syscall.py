@@ -36,8 +36,6 @@ class Check_syscall(plugins.PluginInterface):
 
     def _get_table_size_next_symbol(self, table_addr, ptr_sz, vmlinux):
         """Returns the size of the table based on the next symbol."""
-        ret = 0
-
         symbol_list = []
         for sn in vmlinux.symbols:
             try:
@@ -47,17 +45,16 @@ class Check_syscall(plugins.PluginInterface):
                 pass
         sorted_symbols = sorted(symbol_list)
 
-        sym_address = 0
+        sym_address = next(
+            (
+                tmp_sym_address
+                for tmp_sym_address, sym_name in sorted_symbols
+                if tmp_sym_address > table_addr
+            ),
+            0,
+        )
 
-        for tmp_sym_address, sym_name in sorted_symbols:
-            if tmp_sym_address > table_addr:
-                sym_address = tmp_sym_address
-                break
-
-        if sym_address > 0:
-            ret = int((sym_address - table_addr) / ptr_sz)
-
-        return ret
+        return int((sym_address - table_addr) / ptr_sz) if sym_address > 0 else 0
 
     def _get_table_size_meta(self, vmlinux):
         """returns the number of symbols that start with __syscall_meta__ this
@@ -74,9 +71,7 @@ class Check_syscall(plugins.PluginInterface):
 
         sizes = [size for size in [table_size_meta, table_size_syms] if size > 0]
 
-        table_size = min(sizes)
-
-        return table_size
+        return min(sizes)
 
     def _get_table_info_disassembly(self, ptr_sz, vmlinux):
         """Find the size of the system call table by disassembling functions
@@ -120,9 +115,9 @@ class Check_syscall(plugins.PluginInterface):
         if table_size == 0:
             table_size = self._get_table_info_other(table_sym.address, ptr_sz, vmlinux)
 
-            if table_size == 0:
-                vollog.error("Unable to get system call table size")
-                return 0, 0
+        if table_size == 0:
+            vollog.error("Unable to get system call table size")
+            return 0, 0
 
         return table_sym.address, table_size
 
@@ -131,11 +126,7 @@ class Check_syscall(plugins.PluginInterface):
         vmlinux = self.context.modules[self.config['kernel']]
 
         ptr_sz = vmlinux.get_type("pointer").size
-        if ptr_sz == 4:
-            table_name = "32bit"
-        else:
-            table_name = "64bit"
-
+        table_name = "32bit" if ptr_sz == 4 else "64bit"
         try:
             table_info = self._get_table_info(vmlinux, "sys_call_table", ptr_sz)
         except exceptions.SymbolError:
@@ -166,9 +157,9 @@ class Check_syscall(plugins.PluginInterface):
                 if not call_addr:
                     continue
 
-                symbols = list(vmlinux.get_symbols_by_absolute_location(call_addr))
-
-                if len(symbols) > 0:
+                if symbols := list(
+                    vmlinux.get_symbols_by_absolute_location(call_addr)
+                ):
                     sym_name = str(symbols[0].split(constants.BANG)[1]) if constants.BANG in symbols[0] else \
                         str(symbols[0])
                 else:

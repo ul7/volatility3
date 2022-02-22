@@ -19,11 +19,7 @@ def createservicesid(svc) -> str:
     """ Calculate the Service SID """
     uni = ''.join([c + '\x00' for c in svc])
     sha = hashlib.sha1(uni.upper().encode("utf-8")).digest()  # pylint: disable-msg=E1101
-    dec = list()
-    for i in range(5):
-        ## The use of struct here is OK. It doesn't make much sense
-        ## to leverage obj.Object inside this loop.
-        dec.append(struct.unpack('<I', sha[i * 4:i * 4 + 4])[0])
+    dec = [struct.unpack('<I', sha[i * 4:i * 4 + 4])[0] for i in range(5)]
     return 'S-1-5-80-' + '-'.join([str(n) for n in dec])
 
 

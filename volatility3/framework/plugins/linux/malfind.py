@@ -47,20 +47,18 @@ class Malfind(interfaces.plugins.PluginInterface):
     def _generator(self, tasks):
         # determine if we're on a 32 or 64 bit kernel
         vmlinux = self.context.modules[self.config['kernel']]
-        if self.context.symbol_space.get_type(vmlinux.symbol_table_name + constants.BANG + "pointer").size == 4:
-            is_32bit_arch = True
-        else:
-            is_32bit_arch = False
+        is_32bit_arch = (
+            self.context.symbol_space.get_type(
+                vmlinux.symbol_table_name + constants.BANG + "pointer"
+            ).size
+            == 4
+        )
 
+        architecture = "intel" if is_32bit_arch else "intel64"
         for task in tasks:
             process_name = utility.array_to_string(task.comm)
 
             for vma, data in self._list_injections(task):
-                if is_32bit_arch:
-                    architecture = "intel"
-                else:
-                    architecture = "intel64"
-
                 disasm = interfaces.renderers.Disassembly(data, vma.vm_start, architecture)
 
                 yield (0, (task.pid, process_name, format_hints.Hex(vma.vm_start), format_hints.Hex(vma.vm_end),

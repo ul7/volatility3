@@ -63,9 +63,13 @@ class Check_modules(plugins.PluginInterface):
     def _generator(self):
         kset_modules = self.get_kset_modules(self.context, self.config['kernel'])
 
-        lsmod_modules = set(
+        lsmod_modules = {
             str(utility.array_to_string(modules.name))
-            for modules in lsmod.Lsmod.list_modules(self.context, self.config['kernel']))
+            for modules in lsmod.Lsmod.list_modules(
+                self.context, self.config['kernel']
+            )
+        }
+
 
         for mod_name in set(kset_modules.keys()).difference(lsmod_modules):
             yield (0, (format_hints.Hex(kset_modules[mod_name]), str(mod_name)))

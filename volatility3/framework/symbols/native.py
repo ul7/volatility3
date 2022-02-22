@@ -51,7 +51,7 @@ class NativeTable(interfaces.symbols.NativeTableInterface):
 
         additional: Dict[str, Any] = {}
         obj: Optional[Type[interfaces.objects.ObjectInterface]] = None
-        if type_name == 'void' or type_name == 'function':
+        if type_name in ['void', 'function']:
             obj = objects.Void
         elif type_name == 'array':
             obj = objects.Array

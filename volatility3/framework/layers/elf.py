@@ -45,7 +45,7 @@ class Elf64Layer(segmented.SegmentedLayer):
                 # Cast these to ints to ensure the offsets don't need reconstructing
                 segments.append((int(phdr.p_paddr), int(phdr.p_offset), int(phdr.p_memsz), int(phdr.p_memsz)))
 
-        if len(segments) == 0:
+        if not segments:
             raise ElfFormatException(self.name, f"No ELF segments defined in {self._base_layer}")
 
         self._segments = segments

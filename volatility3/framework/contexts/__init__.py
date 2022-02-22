@@ -163,9 +163,7 @@ def get_module_wrapper(method: str) -> Callable:
     def wrapper(self, name: str) -> Callable:
         if constants.BANG not in name:
             name = self.symbol_table_name + constants.BANG + name
-        elif name.startswith(self.symbol_table_name + constants.BANG):
-            pass
-        else:
+        elif not name.startswith(self.symbol_table_name + constants.BANG):
             raise ValueError(f"Cannot reference another module when calling {method}")
         return getattr(self._context.symbol_space, method)(name)
 
@@ -382,9 +380,12 @@ class ModuleCollection(interfaces.context.ModuleContainer):
             raise ValueError("Size must be strictly non-negative")
         for module_name in self._modules:
             module = self._modules[module_name]
-            if isinstance(module, SizedModule):
-                if (offset <= module.offset + module.size) and (offset + size >= module.offset):
-                    yield (module.name, module.get_symbols_by_absolute_location(offset, size))
+            if (
+                isinstance(module, SizedModule)
+                and (offset <= module.offset + module.size)
+                and (offset + size >= module.offset)
+            ):
+                yield (module.name, module.get_symbols_by_absolute_location(offset, size))
 
 
 class ConfigurableModule(Module, interfaces.configuration.ConfigurableInterface):

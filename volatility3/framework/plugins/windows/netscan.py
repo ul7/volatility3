@@ -104,11 +104,7 @@ class NetScan(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
 
         is_18363_or_later = versions.is_win10_18363_or_later(context = context, symbol_table = nt_symbol_table)
 
-        if is_64bit:
-            arch = "x64"
-        else:
-            arch = "x86"
-
+        arch = "x64" if is_64bit else "x86"
         vers = info.Info.get_version_structure(context, layer_name, nt_symbol_table)
 
         kuser = info.Info.get_kuser_structure(context, layer_name, nt_symbol_table)
@@ -203,11 +199,12 @@ class NetScan(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
         # we need to inspect tcpip.sys's headers to see if we can grab the precise version
         if [ (a,b,c,d) for a, b, c, d in version_dict if (a,b,c) == (nt_major_version, nt_minor_version, vers_minor_version) and d != 0]:
             vollog.debug("Requiring further version inspection due to OS version by checking tcpip.sys's FileVersion header")
-            # the following is IntelLayer specific and might need to be adapted to other architectures.
-            physical_layer_name = context.layers[layer_name].config.get('memory_layer', None)
-            if physical_layer_name:
-                ver = verinfo.VerInfo.find_version_info(context, physical_layer_name, "tcpip.sys")
-                if ver:
+            if physical_layer_name := context.layers[layer_name].config.get(
+                'memory_layer', None
+            ):
+                if ver := verinfo.VerInfo.find_version_info(
+                    context, physical_layer_name, "tcpip.sys"
+                ):
                     tcpip_mod_version = ver[3]
                     vollog.debug("Determined tcpip.sys's FileVersion: {}".format(tcpip_mod_version))
                 else:
@@ -231,16 +228,15 @@ class NetScan(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
             ]
             current_versions.sort()
 
-            if current_versions:
-                latest_version = current_versions[-1]
-
-                filename = version_dict.get(latest_version)
-
-                vollog.debug(f"Unable to find exact matching symbol file, going with latest: {filename}")
-
-            else:
+            if not current_versions:
                 raise NotImplementedError("This version of Windows is not supported: {}.{} {}.{}!".format(
                     nt_major_version, nt_minor_version, vers.MajorVersion, vers_minor_version))
+
+            latest_version = current_versions[-1]
+
+            filename = version_dict.get(latest_version)
+
+            vollog.debug(f"Unable to find exact matching symbol file, going with latest: {filename}")
 
         vollog.debug(f"Determined symbol filename: {filename}")
 
@@ -368,9 +364,14 @@ class NetScan(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
             if not isinstance(row_data[9], datetime.datetime):
                 continue
             row_data = [
-                "N/A" if isinstance(i, renderers.UnreadableValue) or isinstance(i, renderers.UnparsableValue) else i
+                "N/A"
+                if isinstance(
+                    i, (renderers.UnreadableValue, renderers.UnparsableValue)
+                )
+                else i
                 for i in row_data
             ]
+
             description = "Network connection: Process {} {} Local Address {}:{} " \
                           "Remote Address {}:{} State {} Protocol {} ".format(row_data[7], row_data[8],
                                                                               row_data[2], row_data[3],

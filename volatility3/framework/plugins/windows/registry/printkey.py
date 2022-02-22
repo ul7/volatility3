@@ -66,27 +66,40 @@ class PrintKey(interfaces.plugins.PluginInterface):
         node = node_path[-1]
         key_path_items = [hive] + node_path[1:]
         key_path = '\\'.join([k.get_name() for k in key_path_items])
-        if node.vol.type_name.endswith(constants.BANG + '_CELL_DATA'):
+        if node.vol.type_name.endswith(f'{constants.BANG}_CELL_DATA'):
             raise RegistryFormatException(hive.name, "Encountered _CELL_DATA instead of _CM_KEY_NODE")
         last_write_time = conversion.wintime_to_datetime(node.LastWriteTime.QuadPart)
 
         for key_node in node.get_subkeys():
-            result = (len(node_path), True, last_write_time, key_path, key_node.get_volatile(), key_node)
-            yield result
+            yield (
+                len(node_path),
+                True,
+                last_write_time,
+                key_path,
+                key_node.get_volatile(),
+                key_node,
+            )
 
-            if recurse:
-                if key_node.vol.offset not in [x.vol.offset for x in node_path]:
-                    try:
-                        key_node.get_name()
-                    except exceptions.InvalidAddressException as excp:
-                        vollog.debug(excp)
-                        continue
+            if recurse and key_node.vol.offset not in [
+                x.vol.offset for x in node_path
+            ]:
+                try:
+                    key_node.get_name()
+                except exceptions.InvalidAddressException as excp:
+                    vollog.debug(excp)
+                    continue
 
-                    yield from cls.key_iterator(hive, node_path + [key_node], recurse = recurse)
+                yield from cls.key_iterator(hive, node_path + [key_node], recurse = recurse)
 
         for value_node in node.get_values():
-            result = (len(node_path), False, last_write_time, key_path, node.get_volatile(), value_node)
-            yield result
+            yield (
+                len(node_path),
+                False,
+                last_write_time,
+                key_path,
+                node.get_volatile(),
+                value_node,
+            )
 
     def _printkey_iterator(self,
                            hive: RegistryHive,
@@ -147,9 +160,18 @@ class PrintKey(interfaces.plugins.PluginInterface):
                         vollog.debug(excp)
                         value_data = renderers.UnreadableValue()
 
-                result = (depth, (last_write_time, renderers.format_hints.Hex(hive.hive_offset), value_type, key_path,
-                                  value_node_name, value_data, volatile))
-                yield result
+                yield (
+                    depth,
+                    (
+                        last_write_time,
+                        renderers.format_hints.Hex(hive.hive_offset),
+                        value_type,
+                        key_path,
+                        value_node_name,
+                        value_data,
+                        volatile,
+                    ),
+                )
 
     def _registry_walker(self,
                          layer_name: str,
@@ -179,10 +201,18 @@ class PrintKey(interfaces.plugins.PluginInterface):
                     vollog.debug(excp)
                 elif isinstance(excp, exceptions.InvalidAddressException):
                     vollog.debug(f"Invalid address identified in Hive: {hex(excp.invalid_address)}")
-                result = (0, (renderers.UnreadableValue(), format_hints.Hex(hive.hive_offset), "Key",
-                              '?\\' + (key or ''), renderers.UnreadableValue(), renderers.UnreadableValue(),
-                              renderers.UnreadableValue()))
-                yield result
+                yield (
+                    0,
+                    (
+                        renderers.UnreadableValue(),
+                        format_hints.Hex(hive.hive_offset),
+                        "Key",
+                        '?\\' + (key or ''),
+                        renderers.UnreadableValue(),
+                        renderers.UnreadableValue(),
+                        renderers.UnreadableValue(),
+                    ),
+                )
 
     def run(self):
         offset = self.config.get('offset', None)

@@ -63,7 +63,7 @@ class Timeliner(interfaces.plugins.PluginInterface):
         if selected_list:
 
             def filter_plugins(name: str, selected: List[str]) -> bool:
-                return any([s in name for s in selected])
+                return any(s in name for s in selected)
 
             filter_func = filter_plugins
         else:
@@ -152,23 +152,23 @@ class Timeliner(interfaces.plugins.PluginInterface):
                 vollog.log(logging.INFO, f"Exception occurred running plugin: {plugin_name}")
                 vollog.log(logging.DEBUG, traceback.format_exc())
 
-        for data_item in sorted(data, key = self._sort_function):
-            yield data_item
-
+        yield from sorted(data, key = self._sort_function)
         # Write out a body file if necessary
-        if self.config.get('create-bodyfile', True):
-            if fp:
-                fp.close()
-                file_data.close()
+        if self.config.get('create-bodyfile', True) and fp:
+            fp.close()
+            file_data.close()
 
     def _sanitize_body_format(self, value):
         return value.replace("|", "_")
 
     def _any_time_present(self, times):
-        for time in TimeLinerType:
-            if not isinstance(times.get(time, renderers.NotApplicableValue), interfaces.renderers.BaseAbsentValue):
-                return True
-        return False
+        return any(
+            not isinstance(
+                times.get(time, renderers.NotApplicableValue),
+                interfaces.renderers.BaseAbsentValue,
+            )
+            for time in TimeLinerType
+        )
 
     def _text_format(self, value):
         """Formats a value as text, in case it is an AbsentValue"""
@@ -205,14 +205,20 @@ class Timeliner(interfaces.plugins.PluginInterface):
 
                 for requirement in plugin.get_requirements():
                     if requirement.name not in requirement_configs:
-                        config_value = plugin.config.get(requirement.name, None)
-                        if config_value:
+                        if config_value := plugin.config.get(
+                            requirement.name, None
+                        ):
                             requirement_configs[requirement.name] = (requirement, config_value)
 
-                if isinstance(plugin, TimeLinerInterface):
-                    if not len(filter_list) or any(
-                            [filter in plugin.__module__ + '.' + plugin.__class__.__name__ for filter in filter_list]):
-                        plugins_to_run.append(plugin)
+                if isinstance(plugin, TimeLinerInterface) and (
+                    not len(filter_list)
+                    or any(
+                        filter
+                        in f'{plugin.__module__}.{plugin.__class__.__name__}'
+                        for filter in filter_list
+                    )
+                ):
+                    plugins_to_run.append(plugin)
             except exceptions.UnsatisfiedException as excp:
                 # Remove the failed plugin from the list and continue
                 vollog.debug(f"Unable to satisfy {plugin_class.__name__}: {excp.unsatisfied}")

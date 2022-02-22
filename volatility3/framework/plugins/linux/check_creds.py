@@ -49,11 +49,9 @@ class Check_creds(interfaces.plugins.PluginInterface):
 
             creds[cred_addr].append(task.pid)
 
-        for (_, pids) in creds.items():
+        for pids in creds.values():
             if len(pids) > 1:
-                pid_str = ""
-                for pid in pids:
-                    pid_str = pid_str + f"{pid:d}, "
+                pid_str = "".join(f"{pid:d}, " for pid in pids)
                 pid_str = pid_str[:-2]
                 yield (0, [str(pid_str)])
 

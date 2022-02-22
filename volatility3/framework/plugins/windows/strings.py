@@ -65,13 +65,15 @@ class Strings(interfaces.plugins.PluginInterface):
                                        progress_callback = self._progress_callback,
                                        pid_list = self.config['pid'])
 
-        last_prog: float = 0
-        line_count: float  = 0
         num_strings = len(string_list)
-        for offset, string in string_list:
-            line_count += 1
+        last_prog: float = 0
+        for line_count, (offset, string) in enumerate(string_list, start=1):
             try:
-                revmap_list = [name + ":" + hex(offset) for (name, offset) in revmap[offset >> 12]]
+                revmap_list = [
+                    f'{name}:{hex(offset)}'
+                    for (name, offset) in revmap[offset >> 12]
+                ]
+
             except (IndexError, KeyError):
                 revmap_list = ["FREE MEMORY"]
             yield (0, (str(string, 'latin-1'), format_hints.Hex(offset), ", ".join(revmap_list)))
@@ -119,12 +121,12 @@ class Strings(interfaces.plugins.PluginInterface):
         filter = pslist.PsList.create_pid_filter(pid_list)
 
         layer = context.layers[layer_name]
-        reverse_map: Dict[int, Set[Tuple[str, int]]] = dict()
+        reverse_map: Dict[int, Set[Tuple[str, int]]] = {}
         if isinstance(layer, intel.Intel):
             # We don't care about errors, we just wanted chunks that map correctly
             for mapval in layer.mapping(0x0, layer.maximum_address, ignore_errors = True):
                 offset, _, mapped_offset, mapped_size, maplayer = mapval
-                for val in range(mapped_offset, mapped_offset + mapped_size, 0x1000):
+                for _ in range(mapped_offset, mapped_offset + mapped_size, 0x1000):
                     cur_set = reverse_map.get(mapped_offset >> 12, set())
                     cur_set.add(("kernel", offset))
                     reverse_map[mapped_offset >> 12] = cur_set
@@ -148,7 +150,7 @@ class Strings(interfaces.plugins.PluginInterface):
                     if isinstance(proc_layer, linear.LinearlyMappedLayer):
                         for mapval in proc_layer.mapping(0x0, proc_layer.maximum_address, ignore_errors = True):
                             mapped_offset, _, offset, mapped_size, maplayer = mapval
-                            for val in range(mapped_offset, mapped_offset + mapped_size, 0x1000):
+                            for _ in range(mapped_offset, mapped_offset + mapped_size, 0x1000):
                                 cur_set = reverse_map.get(mapped_offset >> 12, set())
                                 cur_set.add((f"Process {process.UniqueProcessId}", offset))
                                 reverse_map[mapped_offset >> 12] = cur_set

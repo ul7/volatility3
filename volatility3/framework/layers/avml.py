@@ -44,8 +44,8 @@ class AVMLLayer(segmented.NonLinearlySegmentedLayer):
     def _load_segments(self) -> None:
         base_layer = self.context.layers[self._base_layer]
         offset = base_layer.minimum_address
+        avml_header_structure = "<IIQQQ"
         while offset + 4 < base_layer.maximum_address:
-            avml_header_structure = "<IIQQQ"
             avml_header_size = struct.calcsize(avml_header_structure)
             avml_header_data = base_layer.read(offset, avml_header_size)
             magic, version, start, end, padding = struct.unpack(avml_header_structure, avml_header_data)

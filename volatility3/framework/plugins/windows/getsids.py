@@ -140,12 +140,10 @@ class GetSIDs(interfaces.plugins.PluginInterface):
                     sid_name = self.servicesids[sid_string]
                 elif sid_string in user_sids:
                     sid_name = user_sids[sid_string]
+                elif sid_name_re := find_sid_re(sid_string, self.well_known_sid_re):
+                    sid_name = sid_name_re
                 else:
-                    sid_name_re = find_sid_re(sid_string, self.well_known_sid_re)
-                    if sid_name_re:
-                        sid_name = sid_name_re
-                    else:
-                        sid_name = ""
+                    sid_name = ""
 
                 yield (0, (task.UniqueProcessId, objects.utility.array_to_string(task.ImageFileName), sid_string,
                            sid_name))

@@ -365,7 +365,10 @@ class PdbReader:
 
     def _read_info_stream(self, stream_number, stream_name, info_list):
         vollog.debug(f"Reading {stream_name}")
-        info_layer = self._context.layers.get(self._layer_name + "_stream" + str(stream_number), None)
+        info_layer = self._context.layers.get(
+            f'{self._layer_name}_stream{str(stream_number)}', None
+        )
+
         if not info_layer:
             raise ValueError(f"No {stream_name} stream available")
         module = self._context.module(module_name = info_layer.pdb_symbol_table,
@@ -396,14 +399,14 @@ class PdbReader:
             output, consumed = self.consume_type(module, offset, length)
             leaf_type, name, value = output
             for tag_type in ['unnamed', 'anonymous']:
-                if name == f'<{tag_type}-tag>' or name == f'__{tag_type}':
-                    name = f'__{tag_type}_' + hex(len(info_list) + 0x1000)[2:]
+                if name in [f'<{tag_type}-tag>', f'__{tag_type}']:
+                    name = f'__{tag_type}_{hex(len(info_list) + 0x1000)[2:]}'
             if name:
                 info_references[name] = len(info_list)
             info_list.append((leaf_type, name, value))
             offset += length
             info_index += 1
-            # Since types can only refer to earlier types, assigning the name at this point is fine
+                # Since types can only refer to earlier types, assigning the name at this point is fine
         if info_layer.maximum_address - offset != 0:
             raise ValueError("Type values did not fill the TPI stream correctly")
         return info_references
@@ -411,7 +414,7 @@ class PdbReader:
     def read_dbi_stream(self) -> None:
         """Reads the DBI Stream."""
         vollog.debug("Reading DBI stream")
-        dbi_layer = self._context.layers.get(self._layer_name + "_stream3", None)
+        dbi_layer = self._context.layers.get(f'{self._layer_name}_stream3', None)
         if not dbi_layer:
             raise ValueError("No DBI stream available")
         module = self._context.module(module_name = dbi_layer.pdb_symbol_table, layer_name = dbi_layer.name, offset = 0)
@@ -430,7 +433,8 @@ class PdbReader:
         self._omap_mapping = []
 
         if self._dbidbgheader.snSectionHdrOrig != -1:
-            section_orig_layer_name = self._layer_name + "_stream" + str(self._dbidbgheader.snSectionHdrOrig)
+            section_orig_layer_name = f'{self._layer_name}_stream{str(self._dbidbgheader.snSectionHdrOrig)}'
+
             consumed, length = 0, self.context.layers[section_orig_layer_name].maximum_address
             while consumed < length:
                 section = self.context.object(dbi_layer.pdb_symbol_table + constants.BANG + "IMAGE_SECTION_HEADER",
@@ -440,16 +444,24 @@ class PdbReader:
                 consumed += section.vol.size
 
             if self._dbidbgheader.snOmapFromSrc != -1:
-                omap_layer_name = self._layer_name + "_stream" + str(self._dbidbgheader.snOmapFromSrc)
+                omap_layer_name = f'{self._layer_name}_stream{str(self._dbidbgheader.snOmapFromSrc)}'
+
                 length = self.context.layers[omap_layer_name].maximum_address
                 data = self.context.layers[omap_layer_name].read(0, length)
                 # For speed we don't use the framework to read this (usually sizeable) data
-                for i in range(0, length, 8):
-                    self._omap_mapping.append(
-                        (int.from_bytes(data[i:i + 4],
-                                        byteorder = 'little'), int.from_bytes(data[i + 4:i + 8], byteorder = 'little')))
+                self._omap_mapping.extend(
+                    (
+                        int.from_bytes(data[i : i + 4], byteorder='little'),
+                        int.from_bytes(data[i + 4 : i + 8], byteorder='little'),
+                    )
+                    for i in range(0, length, 8)
+                )
+
         elif self._dbidbgheader.snSectionHdr != -1:
-            section_layer_name = self._layer_name + "_stream" + str(self._dbidbgheader.snSectionHdr)
+            section_layer_name = (
+                f'{self._layer_name}_stream{str(self._dbidbgheader.snSectionHdr)}'
+            )
+
             consumed, length = 0, self.context.layers[section_layer_name].maximum_address
             while consumed < length:
                 section = self.context.object(dbi_layer.pdb_symbol_table + constants.BANG + "IMAGE_SECTION_HEADER",
@@ -467,7 +479,10 @@ class PdbReader:
 
         vollog.debug("Reading Symbols")
 
-        symrec_layer = self._context.layers.get(self._layer_name + "_stream" + str(self._dbiheader.symrecStream), None)
+        symrec_layer = self._context.layers.get(
+            f'{self._layer_name}_stream{str(self._dbiheader.symrecStream)}', None
+        )
+
         if not symrec_layer:
             raise ValueError("No SymRec stream available")
         module = self._context.module(module_name = symrec_layer.pdb_symbol_table,
@@ -488,7 +503,7 @@ class PdbReader:
                     # v2 symbol (pascal-string)
                     name = self.parse_string(sym.name, True, sym.length - sym.vol.size + 2)
                     address = self._sections[sym.segment - 1].VirtualAddress + sym.offset
-                elif leaf_type == 0x110e or leaf_type == 0x1127:
+                elif leaf_type in [0x110E, 0x1127]:
                     # v3 symbol (c-string)
                     name = self.parse_string(sym.name, False, sym.length - sym.vol.size + 2)
                     address = self._sections[sym.segment - 1].VirtualAddress + sym.offset
@@ -511,7 +526,7 @@ class PdbReader:
             self.read_ipi_stream()
 
         vollog.debug("Reading PDB Info")
-        pdb_info_layer = self._context.layers.get(self._layer_name + "_stream1", None)
+        pdb_info_layer = self._context.layers.get(f'{self._layer_name}_stream1', None)
         if not pdb_info_layer:
             raise ValueError("No PDB Info Stream available")
         module = self._context.module(module_name = pdb_info_layer.pdb_symbol_table,
@@ -528,10 +543,12 @@ class PdbReader:
 
     def convert_bytes_to_guid(self, original: bytes) -> str:
         """Convert the bytes to the correct ordering for a GUID."""
-        orig_guid_list = [x for x in original]
-        guid_list = []
-        for i in [3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15]:
-            guid_list.append(orig_guid_list[i])
+        orig_guid_list = list(original)
+        guid_list = [
+            orig_guid_list[i]
+            for i in [3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15]
+        ]
+
         return str(binascii.hexlify(bytes(guid_list)), "latin-1").upper()
 
     # SYMBOL HANDLING CODE
@@ -587,15 +604,13 @@ class PdbReader:
             base_name, base = primitives[index & 0xff]
             self.bases[base_name] = base
             result: Union[List[Dict[str, Any]], Dict[str, Any]] = {"kind": "base", "name": base_name}
-            indirection = (index & 0xf00)
-            if indirection:
+            if indirection := (index & 0xF00):
                 pointer_name, pointer_base = indirections[indirection]
                 if self.bases.get('pointer', None) and self.bases['pointer'] == pointer_base:
                     result = {"kind": "pointer", "subtype": result}
                 else:
                     self.bases[pointer_name] = pointer_base
                     result = {"kind": "pointer", "base": pointer_name, "subtype": result}
-            return result
         else:
             leaf_type, name, value = self.types[index - 0x1000]
             result = {"kind": "struct", "name": name}
@@ -619,9 +634,8 @@ class PdbReader:
                 size = self.get_size_from_index(index)
                 if self.bases.get("pointer", None) is None:
                     self.bases['pointer'] = {"endian": "little", "kind": "int", "signed": False, "size": size}
-                else:
-                    if size != self.bases['pointer']['size']:
-                        raise ValueError("Native pointers with different sizes!")
+                elif size != self.bases['pointer']['size']:
+                    raise ValueError("Native pointers with different sizes!")
                 result = {"kind": "pointer", "subtype": self.get_type_from_index(value.subtype_index)}
             elif leaf_type in [leaf_type.LF_PROCEDURE]:
                 return {"kind": "function"}
@@ -633,7 +647,8 @@ class PdbReader:
                 result = value
             elif not name:
                 raise ValueError("No name for structure that should be named")
-            return result
+
+        return result
 
     def get_size_from_index(self, index: int) -> int:
         """Returns the size of the structure based on the type index
@@ -816,7 +831,7 @@ class PdbReader:
     def consume_padding(self, layer_name: str, offset: int) -> int:
         """Returns the amount of padding used between fields."""
         val = self.context.layers[layer_name].read(offset, 1)
-        if not ((val[0] & 0xf0) == 0xf0):
+        if val[0] & 0xF0 != 0xF0:
             return 0
         return (int(val[0]) & 0x0f)
 
@@ -839,9 +854,10 @@ class PdbReader:
             for k, v in types.items():
                 types[k] = self.replace_forward_references(v, type_references)
         elif isinstance(types, list):
-            new_types = []
-            for v in types:
-                new_types.append(self.replace_forward_references(v, type_references))
+            new_types = [
+                self.replace_forward_references(v, type_references) for v in types
+            ]
+
             types = new_types
         elif isinstance(types, ForwardArrayCount):
             element_type = types.element_type
@@ -919,10 +935,10 @@ class PdbRetreiver:
         vollog.info("Download PDB file...")
         file_name = ".".join(file_name.split(".")[:-1] + ['pdb'])
         for sym_url in ['http://msdl.microsoft.com/download/symbols']:
-            url = sym_url + f"/{file_name}/{guid}/"
+            url = f'{sym_url}/{file_name}/{guid}/'
 
             result = None
-            for suffix in [file_name, file_name[:-1] + '_']:
+            for suffix in [file_name, f'{file_name[:-1]}_']:
                 try:
                     vollog.debug(f"Attempting to retrieve {url + suffix}")
                     # We have to cache this because the file is opened by a layer and we can't control whether that caches

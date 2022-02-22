@@ -64,7 +64,7 @@ class elf(objects.StructType):
 
     def __getattr__(self, name):
         # Just redirect to the corresponding header
-        if name[0:2] == "e_" and name in dir(self._hdr):
+        if name[:2] == "e_" and name in dir(self._hdr):
             return self._hdr.__getattr__(name)
         else:
             return self.__getattribute__(name)
@@ -90,14 +90,18 @@ class elf(objects.StructType):
             yield prog_header
 
     def get_section_headers(self):
-        section_headers = self._context.object(
+        return self._context.object(
             self.get_symbol_table_name() + constants.BANG + "array",
-            layer_name = self.vol.layer_name,
-            offset = self._offset + self.e_shoff,
-            subtype = self._context.symbol_space.get_type(self.get_symbol_table_name() + constants.BANG +
-                                                          self._type_prefix + "Shdr"),
-            count = self.e_shnum)
-        return section_headers
+            layer_name=self.vol.layer_name,
+            offset=self._offset + self.e_shoff,
+            subtype=self._context.symbol_space.get_type(
+                self.get_symbol_table_name()
+                + constants.BANG
+                + self._type_prefix
+                + "Shdr"
+            ),
+            count=self.e_shnum,
+        )
 
     def _find_symbols(self):
         dt_strtab = None
@@ -178,18 +182,18 @@ class elf_sym(objects.StructType):
     def get_name(self):
         addr = self._cached_strtab + self.st_name
 
-        # Just get the first 255 characters, it should be enough for a symbol name
-        name_bytes = self._context.layers[self.vol.layer_name].read(addr, 255, pad = True)
-
-        if name_bytes:
-            idx = name_bytes.find(b"\x00")
-            if idx != -1:
-                name_bytes = name_bytes[:idx]
-            return name_bytes.decode('utf-8', errors = 'ignore')
-        else:
+        if not (
+            name_bytes := self._context.layers[self.vol.layer_name].read(
+                addr, 255, pad=True
+            )
+        ):
             # If we cannot read the name from the address space,
             # we return None.
             return None
+        idx = name_bytes.find(b"\x00")
+        if idx != -1:
+            name_bytes = name_bytes[:idx]
+        return name_bytes.decode('utf-8', errors = 'ignore')
 
 
 class elf_phdr(objects.StructType):

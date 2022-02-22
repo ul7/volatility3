@@ -112,7 +112,7 @@ class WindowsCrashDump32Layer(segmented.SegmentedLayer):
             buffer_char = summary_header.get_buffer_char()
             buffer_long = summary_header.get_buffer_long()
 
-            for outer_index in range(0, ((summary_header.BitmapSize + 31) // 32)):
+            for outer_index in range((summary_header.BitmapSize + 31) // 32):
                 if buffer_long[outer_index] == 0:
                     if first_bit is not None:
                         last_bit = ((outer_index - 1) * 32) + 31
@@ -125,18 +125,17 @@ class WindowsCrashDump32Layer(segmented.SegmentedLayer):
                         first_bit = outer_index * 32
                     offset = offset + (32 * 0x1000)
                 else:
-                    for inner_index in range(0, 32):
+                    for inner_index in range(32):
                         bit_addr = outer_index * 32 + inner_index
                         if (buffer_char[bit_addr >> 3] >> (bit_addr & 0x7)) & 1:
                             if first_bit is None:
                                 first_offset = offset
                                 first_bit = bit_addr
                             offset = offset + 0x1000
-                        else:
-                            if first_bit is not None:
-                                segment_length = ((bit_addr - 1) - first_bit + 1) * 0x1000
-                                segments.append((first_bit * 0x1000, first_offset, segment_length, segment_length))
-                                first_bit = None
+                        elif first_bit is not None:
+                            segment_length = ((bit_addr - 1) - first_bit + 1) * 0x1000
+                            segments.append((first_bit * 0x1000, first_offset, segment_length, segment_length))
+                            first_bit = None
                 last_bit_seen = (outer_index * 32) + 31
 
             if first_bit is not None:
@@ -146,16 +145,15 @@ class WindowsCrashDump32Layer(segmented.SegmentedLayer):
             vollog.log(constants.LOGLEVEL_VVVV, f"unsupported dump format 0x{self.dump_type:x}")
             raise WindowsCrashDumpFormatException(self.name, f"unsupported dump format 0x{self.dump_type:x}")
 
-        if len(segments) == 0:
+        if not segments:
             raise WindowsCrashDumpFormatException(self.name, f"No Crash segments defined in {self._base_layer}")
-        else:
-            # report the segments for debugging. this is valuable for dev/troubleshooting but
-            # not important enough for a dedicated plugin.
-            for idx, (start_position, mapped_offset, length, _) in enumerate(segments):
-                vollog.log(
-                    constants.LOGLEVEL_VVVV,
-                    "Segment {}: Position {:#x} Offset {:#x} Length {:#x}".format(idx, start_position, mapped_offset,
-                                                                                  length))
+        # report the segments for debugging. this is valuable for dev/troubleshooting but
+        # not important enough for a dedicated plugin.
+        for idx, (start_position, mapped_offset, length, _) in enumerate(segments):
+            vollog.log(
+                constants.LOGLEVEL_VVVV,
+                "Segment {}: Position {:#x} Offset {:#x} Length {:#x}".format(idx, start_position, mapped_offset,
+                                                                              length))
 
         self._segments = segments
 

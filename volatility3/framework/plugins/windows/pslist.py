@@ -96,8 +96,7 @@ class PsList(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
         filter_func = lambda _: False
         # FIXME: mypy #4973 or #2608
         pid_list = pid_list or []
-        filter_list = [x for x in pid_list if x is not None]
-        if filter_list:
+        if filter_list := [x for x in pid_list if x is not None]:
             if exclude:
                 filter_func = lambda x: x.UniqueProcessId in filter_list
             else:
@@ -119,8 +118,7 @@ class PsList(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
         filter_func = lambda _: False
         # FIXME: mypy #4973 or #2608
         name_list = name_list or []
-        filter_list = [x for x in name_list if x is not None]
-        if filter_list:
+        if filter_list := [x for x in name_list if x is not None]:
             if exclude:
                 filter_func = lambda x: utility.array_to_string(x.ImageFileName) in filter_list
             else:

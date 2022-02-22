@@ -65,8 +65,17 @@ class Kauth_scopes(interfaces.plugins.PluginInterface):
 
             identifier = utility.pointer_to_string(scope.ks_identifier, 128)
 
-            yield (0, (identifier, format_hints.Hex(scope.ks_idata), len([l for l in scope.get_listeners()]),
-                       format_hints.Hex(callback), module_name, symbol_name))
+            yield (
+                0,
+                (
+                    identifier,
+                    format_hints.Hex(scope.ks_idata),
+                    len(list(scope.get_listeners())),
+                    format_hints.Hex(callback),
+                    module_name,
+                    symbol_name,
+                ),
+            )
 
     def run(self):
         return renderers.TreeGrid([("Name", str), ("IData", format_hints.Hex), ("Listeners", int),

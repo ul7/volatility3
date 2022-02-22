@@ -89,8 +89,7 @@ class MultiStringScanner(layers.ScannerInterface):
         for entry in sorted(trie):
             # Clump together different paths
             if entry >= 0:
-                remainder = self._process_trie(trie[entry])
-                if remainder:
+                if remainder := self._process_trie(trie[entry]):
                     choices.append(re.escape(bytes([entry])) + remainder)
                 else:
                     suffixes.append(re.escape(bytes([entry])))
@@ -103,7 +102,7 @@ class MultiStringScanner(layers.ScannerInterface):
         elif len(suffixes) > 1:
             choices.append(b'[' + b''.join(suffixes) + b']')
 
-        if len(choices) == 0:
+        if not choices:
             # If there's none, return the empty byte string
             response = b''
         elif len(choices) == 1:

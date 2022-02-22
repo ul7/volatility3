@@ -45,7 +45,7 @@ class HelpfulSubparserAction(argparse._SubParsersAction):
 
         matched_parsers = [name for name in self._name_parser_map if parser_name in name]
 
-        if len(matched_parsers) < 1:
+        if not matched_parsers:
             msg = f"invalid choice {parser_name} (choose from {', '.join(self._name_parser_map)})"
             raise argparse.ArgumentError(self, msg)
         if len(matched_parsers) > 1:

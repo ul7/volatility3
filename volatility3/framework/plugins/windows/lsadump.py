@@ -59,11 +59,7 @@ class Lsadump(interfaces.plugins.PluginInterface):
         if not bootkey:
             return None
 
-        if vista_or_later:
-            policy_key = 'PolEKList'
-        else:
-            policy_key = 'PolSecretEncryptionKey'
-
+        policy_key = 'PolEKList' if vista_or_later else 'PolSecretEncryptionKey'
         enc_reg_key = hashdump.Hashdump.get_hive_key(sechive, "Policy\\" + policy_key)
         if not enc_reg_key:
             return None
@@ -97,12 +93,10 @@ class Lsadump(interfaces.plugins.PluginInterface):
 
         secret = None
         if enc_secret_key:
-            enc_secret_value = next(enc_secret_key.get_values())
-            if enc_secret_value:
-
-                enc_secret = sechive.read(enc_secret_value.Data + 4, enc_secret_value.DataLength)
-                if enc_secret:
-
+            if enc_secret_value := next(enc_secret_key.get_values()):
+                if enc_secret := sechive.read(
+                    enc_secret_value.Data + 4, enc_secret_value.DataLength
+                ):
                     if not is_vista_or_later:
                         secret = cls.decrypt_secret(enc_secret[0xC:], lsakey)
                     else:

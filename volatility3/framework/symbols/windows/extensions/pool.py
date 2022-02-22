@@ -39,7 +39,7 @@ class POOL_HEADER(objects.StructType):
 
         symbol_table_name = self.vol.type_name.split(constants.BANG)[0]
         if constants.BANG in type_name:
-            symbol_table_name, type_name = type_name.split(constants.BANG)[0:2]
+            symbol_table_name, type_name = type_name.split(constants.BANG)[:2]
 
         # when checking for symbols from a table other than nt_symbols grab _OBJECT_HEADER from the kernel
         # because symbol_table_name will be different from kernel_symbol_table.
@@ -55,13 +55,10 @@ class POOL_HEADER(objects.StructType):
 
         # if there is no object type, then just instantiate a structure
         if not executive:
-            mem_object = self._context.object(symbol_table_name + constants.BANG + type_name,
+            yield self._context.object(symbol_table_name + constants.BANG + type_name,
                                               layer_name = self.vol.layer_name,
                                               offset = self.vol.offset + pool_header_size,
                                               native_layer_name = native_layer_name)
-            yield mem_object
-
-        # otherwise we have an executive object in the pool
         else:
             if symbols.symbol_table_is_64bit(self._context, symbol_table_name):
                 alignment = 16
@@ -242,13 +239,11 @@ class POOL_TRACKER_BIG_PAGES(objects.StructType):
 
     def get_pool_type(self) -> Union[str, interfaces.renderers.BaseAbsentValue]:
         """Returns the enum name for the PoolType value on applicable systems"""
-        # Not applicable until Vista
-        if hasattr(self, 'PoolType'):
-            if not self.pool_type_lookup:
-                self._generate_pool_type_lookup()
-            return self.pool_type_lookup.get(self.PoolType, f"Unknown choice {self.PoolType}")
-        else:
+        if not hasattr(self, 'PoolType'):
             return renderers.NotApplicableValue()
+        if not self.pool_type_lookup:
+            self._generate_pool_type_lookup()
+        return self.pool_type_lookup.get(self.PoolType, f"Unknown choice {self.PoolType}")
 
     def get_number_of_bytes(self) -> Union[int, interfaces.renderers.BaseAbsentValue]:
         """Returns the NumberOfBytes value on applicable systems"""
@@ -349,8 +344,9 @@ class OBJECT_HEADER(objects.StructType):
             raise ValueError("Could not find _OBJECT_HEADER_NAME_INFO for object at {} of layer {}".format(
                 self.vol.offset, self.vol.layer_name))
 
-        header = self._context.object(symbol_table_name + constants.BANG + "_OBJECT_HEADER_NAME_INFO",
-                                      layer_name = self.vol.layer_name,
-                                      offset = self.vol.offset - header_offset,
-                                      native_layer_name = self.vol.native_layer_name)
-        return header
+        return self._context.object(
+            symbol_table_name + constants.BANG + "_OBJECT_HEADER_NAME_INFO",
+            layer_name=self.vol.layer_name,
+            offset=self.vol.offset - header_offset,
+            native_layer_name=self.vol.native_layer_name,
+        )

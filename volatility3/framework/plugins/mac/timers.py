@@ -63,11 +63,7 @@ class Timers(plugins.PluginInterface):
                 except exceptions.InvalidAddressException:
                     continue
 
-                if timer.has_member("entry_time"):
-                    entry_time = timer.entry_time
-                else:
-                    entry_time = -1
-
+                entry_time = timer.entry_time if timer.has_member("entry_time") else -1
                 module_name, symbol_name = mac.MacUtilities.lookup_module_address(self.context, handlers, handler,
                                                                                   self.config['kernel'])
 

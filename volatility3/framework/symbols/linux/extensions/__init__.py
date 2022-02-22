@@ -76,7 +76,7 @@ class module(generic.GenericIntelProcess):
 
         idx = 0
         while arr[idx]:
-            idx = idx + 1
+            idx += 1
 
         return idx
 
@@ -87,15 +87,15 @@ class module(generic.GenericIntelProcess):
         else:
             num_sects = self._get_sect_count(self.sect_attrs.grp)
 
-        arr = self._context.object(self.get_symbol_table().name + constants.BANG + "array",
-                                   layer_name = self.vol.layer_name,
-                                   offset = self.sect_attrs.attrs.vol.offset,
-                                   subtype = self._context.symbol_space.get_type(self.get_symbol_table().name +
-                                                                                 constants.BANG + 'module_sect_attr'),
-                                   count = num_sects)
-
-        for attr in arr:
-            yield attr
+        yield from self._context.object(
+            self.get_symbol_table().name + constants.BANG + "array",
+            layer_name=self.vol.layer_name,
+            offset=self.sect_attrs.attrs.vol.offset,
+            subtype=self._context.symbol_space.get_type(
+                self.get_symbol_table().name + constants.BANG + 'module_sect_attr'
+            ),
+            count=num_sects,
+        )
 
     def get_symbols(self):
         if symbols.symbol_table_is_64bit(self._context, self.get_symbol_table().name):
@@ -181,7 +181,7 @@ class task_struct(generic.GenericIntelProcess):
             return None
 
         if preferred_name is None:
-            preferred_name = self.vol.layer_name + f"_Process{self.pid}"
+            preferred_name = f'{self.vol.layer_name}_Process{self.pid}'
 
         # Add the constructed layer and return the name
         return self._add_process_layer(self._context, dtb, config_prefix, preferred_name)
@@ -193,7 +193,7 @@ class task_struct(generic.GenericIntelProcess):
             start = int(vma.vm_start)
             end = int(vma.vm_end)
 
-            if heap_only and not (start <= self.mm.brk and end >= self.mm.start_brk):
+            if heap_only and (start > self.mm.brk or end < self.mm.start_brk):
                 continue
             else:
                 # FIXME: Check if this actually needs to be printed out or not
@@ -301,15 +301,10 @@ class vm_area_struct(objects.StructType):
         """Returns an string representation of the flags in a
         vm_area_struct."""
 
-        retval = ""
-
-        for mask, char in parse_flags.items():
-            if (vm_flags & mask) == mask:
-                retval = retval + char
-            else:
-                retval = retval + '-'
-
-        return retval
+        return "".join(
+            char if (vm_flags & mask) == mask else '-'
+            for mask, char in parse_flags.items()
+        )
 
     # only parse the rwx bits
     def get_protection(self) -> str:
@@ -327,17 +322,15 @@ class vm_area_struct(objects.StructType):
 
     def get_name(self, context, task):
         if self.vm_file != 0:
-            fname = linux.LinuxUtilities.path_for_file(context, task, self.vm_file)
+            return linux.LinuxUtilities.path_for_file(context, task, self.vm_file)
         elif self.vm_start <= task.mm.start_brk and self.vm_end >= task.mm.brk:
-            fname = "[heap]"
+            return "[heap]"
         elif self.vm_start <= task.mm.start_stack and self.vm_end >= task.mm.start_stack:
-            fname = "[stack]"
+            return "[stack]"
         elif self.vm_mm.context.has_member("vdso") and self.vm_start == self.vm_mm.context.vdso:
-            fname = "[vdso]"
+            return "[vdso]"
         else:
-            fname = "Anonymous Mapping"
-
-        return fname
+            return "Anonymous Mapping"
 
     # used by malfind
     def is_suspicious(self):
@@ -357,11 +350,7 @@ class vm_area_struct(objects.StructType):
 class qstr(objects.StructType):
 
     def name_as_str(self) -> str:
-        if self.has_member("len"):
-            str_length = self.len + 1  # Maximum length should include null terminator
-        else:
-            str_length = 255
-
+        str_length = self.len + 1 if self.has_member("len") else 255
         try:
             ret = objects.utility.pointer_to_string(self.name, str_length)
         except (exceptions.InvalidAddressException, ValueError):
@@ -420,9 +409,7 @@ class list_head(objects.StructType, collections.abc.Iterable):
 
         relative_offset = self._context.symbol_space.get_type(symbol_type).relative_child_offset(member)
 
-        direction = 'prev'
-        if forward:
-            direction = 'next'
+        direction = 'next' if forward else 'prev'
         try:
             link = getattr(self, direction).dereference()
         except exceptions.InvalidAddressException:
@@ -434,8 +421,9 @@ class list_head(objects.StructType, collections.abc.Iterable):
         seen = {self.vol.offset}
         while link.vol.offset not in seen:
 
-            obj = self._context.object(symbol_type, layer, offset = link.vol.offset - relative_offset)
-            yield obj
+            yield self._context.object(
+                symbol_type, layer, offset=link.vol.offset - relative_offset
+            )
 
             seen.add(link.vol.offset)
             try:
@@ -533,9 +521,4 @@ class kobject(objects.StructType):
 
     def reference_count(self):
         refcnt = self.kref.refcount
-        if self.has_member("counter"):
-            ret = refcnt.counter
-        else:
-            ret = refcnt.refs.counter
-
-        return ret
+        return refcnt.counter if self.has_member("counter") else refcnt.refs.counter

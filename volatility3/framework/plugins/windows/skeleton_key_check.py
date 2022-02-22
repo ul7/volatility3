@@ -362,14 +362,9 @@ class Skeleton_Key_Check(interfaces.plugins.PluginInterface):
             if inst.mnemonic == "int3":
                 break
 
-            # cCsystems is referenced by a mov instruction
             elif inst.mnemonic == "mov":
                 if not found_count:
-                    target_address = self._get_rip_relative_target(inst)
-
-                    # we do not want to fail just because the count is not in memory
-                    # 16 was the size on samples I tested, so I chose it as the default
-                    if target_address:
+                    if target_address := self._get_rip_relative_target(inst):
                         count = int.from_bytes(self.context.layers[proc_layer_name].read(target_address, 4), "little")
                     else:
                         count = 16
@@ -377,20 +372,17 @@ class Skeleton_Key_Check(interfaces.plugins.PluginInterface):
                     found_count = True
 
             elif inst.mnemonic == "lea":
-                target_address = self._get_rip_relative_target(inst)
-
-                if target_address:
+                if target_address := self._get_rip_relative_target(inst):
                     array_start = target_address
 
                 # we find the count before, so we can terminate the static analysis here
                 break
 
-        if array_start and count:
-            array = self._construct_ecrypt_array(array_start, count, cryptdll_types)
-        else:
-            array = None
-
-        return array
+        return (
+            self._construct_ecrypt_array(array_start, count, cryptdll_types)
+            if array_start and count
+            else None
+        )
 
     def _find_csystems_with_export(self, proc_layer_name: str,
                                    cryptdll_types: interfaces.context.ModuleInterface,

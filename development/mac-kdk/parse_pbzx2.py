@@ -49,9 +49,8 @@ def parse_pbzx(pbzx_path):
             f_content = seekread(f, length = f_length)
             section += 1
             decomp_out = '%s.part%02d.cpio' % (pbzx_path, section)
-            g = open(decomp_out, 'wb')
-            g.write(f_content)
-            g.close()
+            with open(decomp_out, 'wb') as g:
+                g.write(f_content)
             # Now to start the next section, which should hopefully be .xz (we'll just assume it is ...)
             xar_f.close()
             section += 1

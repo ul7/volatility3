@@ -164,9 +164,7 @@ class Volshell(interfaces.plugins.PluginInterface):
 
             ascii_data = ""
             if ascii:
-                connector = " "
-                if chunk_size < 2:
-                    connector = ""
+                connector = "" if chunk_size < 2 else " "
                 ascii_data = connector.join([self._ascii_bytes(x) for x in valid_data])
 
             print(hex(offset), "  ", hex_data, "  ", ascii_data)
@@ -312,8 +310,8 @@ class Volshell(interfaces.plugins.PluginInterface):
                 relative_offset, member_type = volobject.vol.members[member]
                 len_offset = len(hex(relative_offset))
                 len_member = len(member)
-                len_typename = len(member_type.vol.type_name)
                 if isinstance(volobject, interfaces.objects.ObjectInterface):
+                    len_typename = len(member_type.vol.type_name)
                     # We're an instance, so also display the data
                     print(" " * (longest_offset - len_offset), hex(relative_offset), ":  ", member,
                           " " * (longest_member - len_member), "  ",
@@ -349,7 +347,10 @@ class Volshell(interfaces.plugins.PluginInterface):
             constructed = plugins.construct_plugin(self.context, [], plugin, plugin_path, None, NullFileHandler)
             return constructed.run()
         except exceptions.UnsatisfiedException as excp:
-            print(f"Unable to validate the plugin requirements: {[x for x in excp.unsatisfied]}\n")
+            print(
+                f'Unable to validate the plugin requirements: {list(excp.unsatisfied)}\n'
+            )
+
         return None
 
     def render_treegrid(self,
@@ -387,7 +388,7 @@ class Volshell(interfaces.plugins.PluginInterface):
     def run_script(self, location: str):
         """Runs a python script within the context of volshell"""
         if not parse.urlparse(location).scheme:
-            location = "file:" + request.pathname2url(location)
+            location = f'file:{request.pathname2url(location)}'
         print(f"Running code from {location}\n")
         accessor = resources.ResourceAccessor()
         with io.TextIOWrapper(accessor.open(url = location), encoding = 'utf-8') as fp:
@@ -398,7 +399,7 @@ class Volshell(interfaces.plugins.PluginInterface):
         """Loads a file into a Filelayer and returns the name of the layer"""
         layer_name = self.context.layers.free_layer_name()
         location = volshell.VolShell.location_from_file(location)
-        current_config_path = 'volshell.layers.' + layer_name
+        current_config_path = f'volshell.layers.{layer_name}'
         self.context.config[interfaces.configuration.path_join(current_config_path, "location")] = location
         layer = physical.FileLayer(self.context, current_config_path, layer_name)
         self.context.add_layer(layer)
@@ -407,7 +408,7 @@ class Volshell(interfaces.plugins.PluginInterface):
     def create_configurable(self, clazz: Type[interfaces.configuration.ConfigurableInterface], **kwargs):
         """Creates a configurable object, converting arguments to configuration"""
         config_name = self.random_string()
-        config_path = 'volshell.configurable.' + config_name
+        config_path = f'volshell.configurable.{config_name}'
 
         constructor_args = {}
         constructor_keywords = []
@@ -425,9 +426,8 @@ class Volshell(interfaces.plugins.PluginInterface):
         for keyword in kwargs:
             val = kwargs[keyword]
             if not isinstance(val, interfaces.configuration.BasicTypes) and not isinstance(val, list):
-                if not isinstance(val, list) or all([isinstance(x, interfaces.configuration.BasicTypes) for x in val]):
-                    raise TypeError("Configurable values must be simple types (int, bool, str, bytes)")
-            self.context.config[config_path + '.' + keyword] = val
+                raise TypeError("Configurable values must be simple types (int, bool, str, bytes)")
+            self.context.config[f'{config_path}.{keyword}'] = val
 
         constructed = clazz(self.context, config_path, **constructor_args)
 

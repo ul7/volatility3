@@ -349,7 +349,7 @@ class DataLayerInterface(interfaces.configuration.ConfigurableInterface, metacla
         config = super().build_configuration()
 
         # Translation Layers are constructable, and therefore require a class configuration variable
-        config["class"] = self.__class__.__module__ + "." + self.__class__.__name__
+        config["class"] = f'{self.__class__.__module__}.{self.__class__.__name__}'
         return config
 
     # ## Metadata methods
@@ -426,9 +426,7 @@ class TranslationLayerInterface(DataLayerInterface, metaclass = ABCMeta):
         length size."""
         current_offset = offset
         output: bytes = b''
-        for (layer_offset, sublength, mapped_offset, mapped_length, layer) in self.mapping(offset,
-                                                                                           length,
-                                                                                           ignore_errors = pad):
+        for (layer_offset, sublength, mapped_offset, mapped_length, layer) in self.mapping(current_offset, length, ignore_errors = pad):
             if not pad and layer_offset > current_offset:
                 raise exceptions.InvalidAddressException(
                     self.name, current_offset, f"Layer {self.name} cannot map offset: {current_offset}")
@@ -570,8 +568,11 @@ class LayerContainer(collections.abc.Mapping):
         if layer.name in self._layers:
             raise exceptions.LayerException(layer.name, f"Layer already exists: {layer.name}")
         if isinstance(layer, TranslationLayerInterface):
-            missing_list = [sublayer for sublayer in layer.dependencies if sublayer not in self._layers]
-            if missing_list:
+            if missing_list := [
+                sublayer
+                for sublayer in layer.dependencies
+                if sublayer not in self._layers
+            ]:
                 raise exceptions.LayerException(
                     layer.name, f"Layer {layer.name} has unmet dependencies: {', '.join(missing_list)}")
         self._layers[layer.name] = layer
@@ -585,8 +586,11 @@ class LayerContainer(collections.abc.Mapping):
             name: The name of the layer to delete
         """
         for layer in self._layers:
-            depend_list = [superlayer for superlayer in self._layers if name in self._layers[layer].dependencies]
-            if depend_list:
+            if depend_list := [
+                superlayer
+                for superlayer in self._layers
+                if name in self._layers[layer].dependencies
+            ]:
                 raise exceptions.LayerException(
                     self._layers[layer].name,
                     f"Layer {self._layers[layer].name} is depended upon: {', '.join(depend_list)}")

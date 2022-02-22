@@ -47,11 +47,13 @@ def require_interface_version(*args) -> None:
         if args[0] != interface_version()[0]:
             raise RuntimeError("Framework interface version {} is incompatible with required version {}".format(
                 interface_version()[0], args[0]))
-        if len(args) > 1:
-            if args[1] > interface_version()[1]:
-                raise RuntimeError(
-                    "Framework interface version {} is an older revision than the required version {}".format(
-                        ".".join([str(x) for x in interface_version()[0:1]]), ".".join([str(x) for x in args[0:2]])))
+        if len(args) > 1 and args[1] > interface_version()[1]:
+            raise RuntimeError(
+                "Framework interface version {} is an older revision than the required version {}".format(
+                    ".".join([str(x) for x in interface_version()[:1]]),
+                    ".".join([str(x) for x in args[:2]]),
+                )
+            )
 
 
 class NonInheritable(object):
@@ -84,8 +86,7 @@ def class_subclasses(cls: Type[T]) -> Generator[Type[T], None, None]:
         # The typing system is not clever enough to realize that clazz has a hidden attr after the hasattr check
         if not hasattr(clazz, 'hidden') or not clazz.hidden:  # type: ignore
             yield clazz
-        for return_value in class_subclasses(clazz):
-            yield return_value
+        yield from class_subclasses(clazz)
 
 
 def import_files(base_module, ignore_errors: bool = False) -> List[str]:
@@ -110,7 +111,7 @@ def import_files(base_module, ignore_errors: bool = False) -> List[str]:
                             try:
                                 new_module = getattr(new_module, component)
                             except AttributeError:
-                                failures += [new_module + '.' + component]
+                                failures += [f'{new_module}.{component}']
                     new_module.__path__ = [os.path.join(root, filename)] + new_module.__path__
                     for ziproot, zipfiles in _zipwalk(os.path.join(root, filename)):
                         for zfile in zipfiles:
@@ -118,13 +119,15 @@ def import_files(base_module, ignore_errors: bool = False) -> List[str]:
                                 submodule = zfile[:zfile.rfind('.')].replace(os.path.sep, '.')
                                 failures += import_file(new_module.__name__ + '.' + submodule,
                                                         os.path.join(path, ziproot, zfile))
-                else:
-                    if _filter_files(filename):
-                        modpath = os.path.join(root[len(path) + len(os.path.sep):], filename[:filename.rfind(".")])
-                        submodule = modpath.replace(os.path.sep, ".")
-                        failures += import_file(base_module.__name__ + '.' + submodule,
-                                                os.path.join(root, filename),
-                                                ignore_errors)
+                elif _filter_files(filename):
+                    modpath = os.path.join(root[len(path) + len(os.path.sep):], filename[:filename.rfind(".")])
+                    submodule = modpath.replace(os.path.sep, ".")
+                    failures += import_file(
+                        f'{base_module.__name__}.{submodule}',
+                        os.path.join(root, filename),
+                        ignore_errors,
+                    )
+
 
     return failures
 
@@ -168,14 +171,13 @@ def _zipwalk(path: str):
                 dirlist = zip_results.get(os.path.dirname(file.filename), [])
                 dirlist.append(os.path.basename(file.filename))
                 zip_results[os.path.join(path, os.path.dirname(file.filename))] = dirlist
-    for value in zip_results:
-        yield value, zip_results[value]
+    yield from zip_results.items()
 
 
 def list_plugins() -> Dict[str, Type[interfaces.plugins.PluginInterface]]:
     plugin_list = {}
     for plugin in class_subclasses(interfaces.plugins.PluginInterface):
-        plugin_name = plugin.__module__ + "." + plugin.__name__
+        plugin_name = f'{plugin.__module__}.{plugin.__name__}'
         if plugin_name.startswith("volatility3.plugins."):
             plugin_name = plugin_name[len("volatility3.plugins."):]
         plugin_list[plugin_name] = plugin
@@ -185,6 +187,6 @@ def list_plugins() -> Dict[str, Type[interfaces.plugins.PluginInterface]]:
 def clear_cache(complete = False):
     glob_pattern = '*.cache'
     if not complete:
-        glob_pattern = 'data_' + glob_pattern
+        glob_pattern = f'data_{glob_pattern}'
     for cache_filename in glob.glob(os.path.join(constants.CACHE_PATH, glob_pattern)):
         os.unlink(cache_filename)

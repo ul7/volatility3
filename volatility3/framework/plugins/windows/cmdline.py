@@ -49,9 +49,7 @@ class CmdLine(interfaces.plugins.PluginInterface):
         peb = context.object(kernel_table_name + constants.BANG + "_PEB",
                              layer_name = proc_layer_name,
                              offset = proc.Peb)
-        result_text = peb.ProcessParameters.CommandLine.get_string()
-
-        return result_text
+        return peb.ProcessParameters.CommandLine.get_string()
 
     def _generator(self, procs):
         kernel = self.context.modules[self.config['kernel']]

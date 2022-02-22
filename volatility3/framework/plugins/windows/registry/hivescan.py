@@ -31,8 +31,7 @@ class HiveScan(interfaces.plugins.PluginInterface):
     def scan_hives(cls,
                    context: interfaces.context.ContextInterface,
                    layer_name: str,
-                   symbol_table: str) -> \
-            Iterable[interfaces.objects.ObjectInterface]:
+                   symbol_table: str) -> Iterable[interfaces.objects.ObjectInterface]:
         """Scans for hives using the poolscanner module and constraints or bigpools module with tag.
 
         Args:
@@ -55,8 +54,9 @@ class HiveScan(interfaces.plugins.PluginInterface):
                                                          layer_name = layer_name,
                                                          symbol_table = symbol_table,
                                                          tags = ["CM10"]):
-                cmhive = ntkrnlmp.object(object_type = "_CMHIVE", offset = pool.Va, absolute = True)
-                yield cmhive
+                yield ntkrnlmp.object(
+                    object_type="_CMHIVE", offset=pool.Va, absolute=True
+                )
 
         else:
             constraints = poolscanner.PoolScanner.builtin_constraints(symbol_table, [b'CM10'])

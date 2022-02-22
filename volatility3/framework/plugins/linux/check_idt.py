@@ -42,20 +42,22 @@ class Check_idt(interfaces.plugins.PluginInterface):
         address_mask = self.context.layers[vmlinux.layer_name].address_mask
 
         # hw handlers + system call
-        check_idxs = list(range(0, 20)) + [128]
+        check_idxs = list(range(20)) + [128]
 
-        if is_32bit:
-            if vmlinux.has_type("gate_struct"):
-                idt_type = "gate_struct"
-            else:
-                idt_type = "desc_struct"
+        if (
+            is_32bit
+            and vmlinux.has_type("gate_struct")
+            or not is_32bit
+            and not vmlinux.has_type("gate_struct64")
+            and vmlinux.has_type("gate_struct")
+        ):
+            idt_type = "gate_struct"
+        elif is_32bit and not vmlinux.has_type("gate_struct"):
+            idt_type = "desc_struct"
+        elif not is_32bit and vmlinux.has_type("gate_struct64"):
+            idt_type = "gate_struct64"
         else:
-            if vmlinux.has_type("gate_struct64"):
-                idt_type = "gate_struct64"
-            elif vmlinux.has_type("gate_struct"):
-                idt_type = "gate_struct"
-            else:
-                idt_type = "idt_desc"
+            idt_type = "idt_desc"
 
         addrs = vmlinux.object_from_symbol("idt_table")
 
@@ -77,11 +79,7 @@ class Check_idt(interfaces.plugins.PluginInterface):
                 low = ent.offset_low
                 middle = ent.offset_middle
 
-                if hasattr(ent, "offset_high"):
-                    high = ent.offset_high
-                else:
-                    high = 0
-
+                high = ent.offset_high if hasattr(ent, "offset_high") else 0
                 idt_addr = (high << 32) | (middle << 16) | low
 
                 idt_addr = idt_addr & address_mask

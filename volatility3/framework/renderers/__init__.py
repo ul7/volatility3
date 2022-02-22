@@ -161,7 +161,7 @@ class TreeGrid(interfaces.renderers.TreeGrid):
         self._row_count = 0
         self._children: List[interfaces.renderers.TreeNode] = []
         converted_columns: List[interfaces.renderers.Column] = []
-        if len(columns) < 1:
+        if not columns:
             raise ValueError("Columns must be a list containing at least one column")
         for (name, column_type) in columns:
             is_simple_type = issubclass(column_type, self.base_types)
@@ -179,11 +179,11 @@ class TreeGrid(interfaces.renderers.TreeGrid):
 
     @staticmethod
     def sanitize_name(text: str) -> str:
-        output = ""
-        for letter in text.lower():
-            if letter != ' ':
-                output += (letter if letter in 'abcdefghiljklmnopqrstuvwxyz_0123456789' else '_')
-        return output
+        return "".join(
+            (letter if letter in 'abcdefghiljklmnopqrstuvwxyz_0123456789' else '_')
+            for letter in text.lower()
+            if letter != ' '
+        )
 
     def populate(self,
                  function: interfaces.renderers.VisitorSignature = None,
@@ -276,10 +276,8 @@ class TreeGrid(interfaces.renderers.TreeGrid):
 
     def _insert(self, parent: Optional[interfaces.renderers.TreeNode], position: Optional[int], values: Any) -> TreeNode:
         """Inserts an element into the tree at a specific position."""
-        parent_path = ""
         children = self._find_children(parent)
-        if parent is not None:
-            parent_path = parent.path + self.path_sep
+        parent_path = parent.path + self.path_sep if parent is not None else ""
         if position is None:
             newpath = parent_path + str(len(children))
         else:

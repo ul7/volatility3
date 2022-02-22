@@ -199,7 +199,7 @@ class ObjectInterface(metaclass = abc.ABCMeta):
         Args:
             member_names: List of names to test as to members with those names validity
         """
-        return all([self.has_valid_member(member_name) for member_name in member_names])
+        return all(self.has_valid_member(member_name) for member_name in member_names)
 
     class VolTemplateProxy(metaclass = abc.ABCMeta):
         """A container for proxied methods that the ObjectTemplate of this
@@ -316,8 +316,7 @@ class Template:
     def clone(self) -> 'Template':
         """Returns a copy of the original Template as constructed (without
         `update_vol` additions having been made)"""
-        clone = self.__class__(**self._vol.parents.new_child())
-        return clone
+        return self.__class__(**self._vol.parents.new_child())
 
     def update_vol(self, **new_arguments) -> None:
         """Updates the keyword arguments with values that will **not** be
@@ -327,9 +326,8 @@ class Template:
     def __getattr__(self, attr: str) -> Any:
         """Exposes any other values stored in ._vol as attributes (for example,
         enumeration choices)"""
-        if attr != '_vol':
-            if attr in self._vol:
-                return self._vol[attr]
+        if attr != '_vol' and attr in self._vol:
+            return self._vol[attr]
         raise AttributeError(f"{self.__class__.__name__} object has no attribute {attr}")
 
     def __call__(self, context: 'interfaces.context.ContextInterface',

@@ -60,8 +60,7 @@ class Info(plugins.PluginInterface):
 
         kvo = virtual_layer.config["kernel_virtual_offset"]
 
-        ntkrnlmp = context.module(symbol_table, layer_name = layer_name, offset = kvo)
-        return ntkrnlmp
+        return context.module(symbol_table, layer_name = layer_name, offset = kvo)
 
     @classmethod
     def get_kdbg_structure(cls, context: interfaces.context.ContextInterface, config_path: str, layer_name: str,
@@ -81,11 +80,9 @@ class Info(plugins.PluginInterface):
                                                                   native_types = native_types,
                                                                   class_types = extensions.kdbg.class_types)
 
-        kdbg = context.object(kdbg_table_name + constants.BANG + "_KDDEBUGGER_DATA64",
+        return context.object(kdbg_table_name + constants.BANG + "_KDDEBUGGER_DATA64",
                               offset = ntkrnlmp.offset + kdbg_offset,
                               layer_name = layer_name)
-
-        return kdbg
 
     @classmethod
     def get_kuser_structure(cls, context: interfaces.context.ContextInterface, layer_name: str,
@@ -103,12 +100,10 @@ class Info(plugins.PluginInterface):
         else:
             kuser_addr = 0xFFFFF78000000000
 
-        kuser = ntkrnlmp.object(object_type = "_KUSER_SHARED_DATA",
+        return ntkrnlmp.object(object_type = "_KUSER_SHARED_DATA",
                                 layer_name = layer_name,
                                 offset = kuser_addr,
                                 absolute = True)
-
-        return kuser
 
     @classmethod
     def get_version_structure(cls, context: interfaces.context.ContextInterface, layer_name: str,
@@ -118,9 +113,11 @@ class Info(plugins.PluginInterface):
 
         vers_offset = ntkrnlmp.get_symbol("KdVersionBlock").address
 
-        vers = ntkrnlmp.object(object_type = "_DBGKD_GET_VERSION64", layer_name = layer_name, offset = vers_offset)
-
-        return vers
+        return ntkrnlmp.object(
+            object_type="_DBGKD_GET_VERSION64",
+            layer_name=layer_name,
+            offset=vers_offset,
+        )
 
     @classmethod
     def get_ntheader_structure(cls, context: interfaces.context.ContextInterface, config_path: str,
@@ -142,9 +139,7 @@ class Info(plugins.PluginInterface):
                                     offset = kvo,
                                     layer_name = layer_name)
 
-        nt_header = dos_header.get_nt_header()
-
-        return nt_header
+        return dos_header.get_nt_header()
 
     def _generator(self):
 

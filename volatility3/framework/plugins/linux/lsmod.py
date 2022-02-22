@@ -50,8 +50,7 @@ class Lsmod(plugins.PluginInterface):
 
         table_name = modules.vol.type_name.split(constants.BANG)[0]
 
-        for module in modules.to_list(table_name + constants.BANG + "module", "list"):
-            yield module
+        yield from modules.to_list(table_name + constants.BANG + "module", "list")
 
     def _generator(self):
         try:

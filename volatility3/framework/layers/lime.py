@@ -52,7 +52,7 @@ class LimeLayer(segmented.SegmentedLayer):
             maxaddr = end
             offset = offset + header_size + segment_length
 
-        if len(segments) == 0:
+        if not segments:
             raise LimeFormatException(self.name, f"No LiME segments defined in {self._base_layer}")
 
         self._segments = segments

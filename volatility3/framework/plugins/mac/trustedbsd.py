@@ -44,7 +44,7 @@ class Trustedbsd(plugins.PluginInterface):
                                 absolute = True,
                                 count = policy_list.staticmax + 1)
 
-        for i, ent in enumerate(entries):
+        for ent in entries:
             # I don't know how this can happen, but the kernel makes this check all over the place
             # the policy isn't useful without any ops so a rootkit can't abuse this
             try:

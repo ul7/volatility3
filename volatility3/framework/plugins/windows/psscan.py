@@ -152,7 +152,7 @@ class PsScan(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
                                                                 "windows",
                                                                 "pe",
                                                                 class_types = pe.class_types)
-        memory = self.context.layers[kernel.layer_name] 
+        memory = self.context.layers[kernel.layer_name]
         if not isinstance(memory, layers.intel.Intel):
             raise TypeError("Primary layer is not an intel layer")
 
@@ -170,13 +170,16 @@ class PsScan(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
                     vproc = self.virtual_process_from_physical(self.context, kernel.layer_name,
                                                                kernel.symbol_table_name, proc)
 
-                file_handle = pslist.PsList.process_dump(self.context, kernel.symbol_table_name,
-                                                         pe_table_name, vproc,
-                                                         self.open)
-                file_output = "Error outputting file"
-                if file_handle:
+                if file_handle := pslist.PsList.process_dump(
+                    self.context,
+                    kernel.symbol_table_name,
+                    pe_table_name,
+                    vproc,
+                    self.open,
+                ):
                     file_output = file_handle.preferred_filename
-
+                else:
+                    file_output = "Error outputting file"
             if not self.config['physical']:
                 offset = proc.vol.offset
             else:

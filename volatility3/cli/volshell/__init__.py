@@ -106,7 +106,7 @@ class VolShell(cli.CommandLine):
 
         # We have to filter out help, otherwise parse_known_args will trigger the help message before having
         # processed the plugin choice or had the plugin subparser added.
-        known_args = [arg for arg in sys.argv if arg != '--help' and arg != '-h']
+        known_args = [arg for arg in sys.argv if arg not in ['--help', '-h']]
         partial_args, _ = parser.parse_known_args(known_args)
         if partial_args.plugin_dirs:
             volatility3.plugins.__path__ = [os.path.abspath(p)
@@ -141,9 +141,7 @@ class VolShell(cli.CommandLine):
 
         # Do the initialization
         ctx = contexts.Context()  # Construct a blank context
-        failures = framework.import_files(volatility3.plugins,
-                                          True)  # Will not log as console's default level is WARNING
-        if failures:
+        if failures := framework.import_files(volatility3.plugins, True):
             parser.epilog = "The following plugins could not be loaded (use -vv to see why): " + \
                             ", ".join(sorted(failures))
             vollog.info(parser.epilog)
@@ -164,11 +162,11 @@ class VolShell(cli.CommandLine):
 
         # We don't list plugin arguments, because they can be provided within python
         volshell_plugin_list = {'generic': generic.Volshell, 'windows': windows.Volshell}
-        for plugin in volshell_plugin_list:
+        for plugin, value_ in volshell_plugin_list.items():
             subparser = parser.add_argument_group(title = plugin.capitalize(),
                                                   description = "Configuration options based on {} options".format(
                                                       plugin.capitalize()))
-            self.populate_requirements_argparse(subparser, volshell_plugin_list[plugin])
+            self.populate_requirements_argparse(subparser, value_)
             configurables_list[plugin] = volshell_plugin_list[plugin]
 
         ###
@@ -239,7 +237,11 @@ class VolShell(cli.CommandLine):
                     json.dump(dict(constructed.build_configuration()), f, sort_keys = True, indent = 2)
         except exceptions.UnsatisfiedException as excp:
             self.process_unsatisfied_exceptions(excp)
-            parser.exit(1, f"Unable to validate the plugin requirements: {[x for x in excp.unsatisfied]}\n")
+            parser.exit(
+                1,
+                f'Unable to validate the plugin requirements: {list(excp.unsatisfied)}\n',
+            )
+
 
         try:
             # Construct and run the plugin
@@ -247,7 +249,10 @@ class VolShell(cli.CommandLine):
                 constructed.run()
         except exceptions.VolatilityException as excp:
             self.process_exceptions(excp)
-            parser.exit(1, f"Unable to validate the plugin requirements: {[x for x in excp.unsatisfied]}\n")
+            parser.exit(
+                1,
+                f'Unable to validate the plugin requirements: {list(excp.unsatisfied)}\n',
+            )
 
 
 def main():

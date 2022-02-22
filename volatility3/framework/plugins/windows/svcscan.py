@@ -105,11 +105,7 @@ class SvcScan(interfaces.plugins.PluginInterface):
         is_vista_or_later = versions.is_vista_or_later(context = self.context,
                                                        symbol_table = kernel.symbol_table_name)
 
-        if is_vista_or_later:
-            service_tag = b"serH"
-        else:
-            service_tag = b"sErv"
-
+        service_tag = b"serH" if is_vista_or_later else b"sErv"
         seen = []
 
         for task in pslist.PsList.list_processes(context = self.context,

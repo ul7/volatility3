@@ -96,13 +96,14 @@ class BigPools(interfaces.plugins.PluginInterface):
                                     absolute = True)
 
         for big_pool in big_pools:
-            if big_pool.is_valid():
-                if tags is None or big_pool.get_key() in tags:
-                    yield big_pool
+            if big_pool.is_valid() and (
+                tags is None or big_pool.get_key() in tags
+            ):
+                yield big_pool
 
     def _generator(self) -> Iterator[Tuple[int, Tuple[int, str]]]:  # , str, int]]]:
         if self.config.get("tags"):
-            tags = [tag for tag in self.config["tags"].split(',')]
+            tags = list(self.config["tags"].split(','))
         else:
             tags = None
         kernel = self.context.modules[self.config['kernel']]

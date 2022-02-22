@@ -63,7 +63,7 @@ class PoolHeaderScanner(interfaces.layers.ScannerInterface):
 
         header_type = self._module.get_type('_POOL_HEADER')
         self._header_offset = header_type.relative_child_offset('PoolTag')
-        self._subscanner = scanners.MultiStringScanner([c for c in constraint_lookup.keys()])
+        self._subscanner = scanners.MultiStringScanner(list(constraint_lookup.keys()))
 
     def __call__(self, data: bytes, data_offset: int):
         for offset, pattern in self._subscanner(data, data_offset):
@@ -74,12 +74,18 @@ class PoolHeaderScanner(interfaces.layers.ScannerInterface):
             try:
                 # Size check
                 if constraint.size is not None:
-                    if constraint.size[0]:
-                        if (self._alignment * header.BlockSize) < constraint.size[0]:
-                            continue
-                    if constraint.size[1]:
-                        if (self._alignment * header.BlockSize) > constraint.size[1]:
-                            continue
+                    if (
+                        constraint.size[0]
+                        and (self._alignment * header.BlockSize)
+                        < constraint.size[0]
+                    ):
+                        continue
+                    if (
+                        constraint.size[1]
+                        and (self._alignment * header.BlockSize)
+                        > constraint.size[1]
+                    ):
+                        continue
 
                 # Type check
                 if constraint.page_type is not None:
@@ -96,12 +102,16 @@ class PoolHeaderScanner(interfaces.layers.ScannerInterface):
                         continue
 
                 if constraint.index is not None:
-                    if constraint.index[0]:
-                        if header.PoolIndex < constraint.index[0]:
-                            continue
-                    if constraint.index[1]:
-                        if header.PoolIndex > constraint.index[1]:
-                            continue
+                    if (
+                        constraint.index[0]
+                        and header.PoolIndex < constraint.index[0]
+                    ):
+                        continue
+                    if (
+                        constraint.index[1]
+                        and header.PoolIndex > constraint.index[1]
+                    ):
+                        continue
 
             except exceptions.InvalidAddressException:
                 # The tested object's header doesn't point to valid addresses, ignore it
@@ -257,8 +267,7 @@ class PoolScanner(plugins.PluginInterface):
                            context: interfaces.context.ContextInterface,
                            layer_name: str,
                            symbol_table: str,
-                           constraints: List[PoolConstraint]) \
-            -> Generator[Tuple[
+                           constraints: List[PoolConstraint]) -> Generator[Tuple[
                              PoolConstraint, interfaces.objects.ObjectInterface, interfaces.objects.ObjectInterface], None, None]:
         """
 
@@ -287,11 +296,7 @@ class PoolScanner(plugins.PluginInterface):
         if not is_windows_10:
             scan_layer = context.layers[scan_layer].config['memory_layer']
 
-        if symbols.symbol_table_is_64bit(context, symbol_table):
-            alignment = 0x10
-        else:
-            alignment = 8
-
+        alignment = 0x10 if symbols.symbol_table_is_64bit(context, symbol_table) else 8
         for constraint, header in cls.pool_scan(context, scan_layer, symbol_table, constraints, alignment = alignment):
 
             mem_objects = header.get_object(constraint = constraint,

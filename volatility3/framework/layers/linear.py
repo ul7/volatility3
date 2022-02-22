@@ -17,10 +17,10 @@ class LinearlyMappedLayer(interfaces.layers.TranslationLayerInterface):
             if original_offset != offset:
                 raise exceptions.LayerException(self.name,
                                                 f"Layer {self.name} claims to map linearly but does not")
+        elif ignore_errors:
+            # We should only hit this if we ignored errors, but check anyway
+            return None, None
         else:
-            if ignore_errors:
-                # We should only hit this if we ignored errors, but check anyway
-                return None, None
             raise exceptions.InvalidAddressException(self.name, offset,
                                                      f"Cannot translate {offset} in layer {self.name}")
         return mapped_offset, layer

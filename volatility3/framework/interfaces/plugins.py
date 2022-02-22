@@ -61,11 +61,9 @@ class FileHandlerInterface(io.RawIOBase):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if exc_type is None and exc_value is None and traceback is None:
-            self.close()
-        else:
+        if exc_type is not None or exc_value is not None or traceback is not None:
             vollog.warning(f"File {self._preferred_filename} could not be written: {str(exc_value)}")
-            self.close()
+        self.close()
 
 
 #

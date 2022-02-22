@@ -51,9 +51,8 @@ class Volshell(generic.Volshell):
                      object: Union[str, interfaces.objects.ObjectInterface, interfaces.objects.Template],
                      offset: int = None):
         """Display Type describes the members of a particular object in alphabetical order"""
-        if isinstance(object, str):
-            if constants.BANG not in object:
-                object = self.current_symbol_table + constants.BANG + object
+        if isinstance(object, str) and constants.BANG not in object:
+            object = self.current_symbol_table + constants.BANG + object
         return super().display_type(object, offset)
 
     def display_symbols(self, symbol_table: str = None):

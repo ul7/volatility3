@@ -170,8 +170,10 @@ class KernelPDBScanner(interfaces.automagic.AutomagicInterface):
                 kvo = kernel['mz_offset'] + (1 << (vlayer.bits_per_register - 1))
             try:
                 kvp = vlayer.mapping(kvo, 0)
-                if (any([(p == kernel['mz_offset'] and layer_name == physical_layer_name)
-                         for (_, _, p, _, layer_name) in kvp])):
+                if any(
+                    (p == kernel['mz_offset'] and layer_name == physical_layer_name)
+                    for (_, _, p, _, layer_name) in kvp
+                ):
                     return (virtual_layer_name, kvo, kernel)
                 else:
                     vollog.debug("Potential kernel_virtual_offset did not map to expected location: {}".format(
@@ -194,16 +196,17 @@ class KernelPDBScanner(interfaces.automagic.AutomagicInterface):
         virtual_layer_name = vlayer.name
         physical_layer_name = self.get_physical_layer_name(context, vlayer)
 
-        layer_to_scan = physical_layer_name
-        if not physical:
-            layer_to_scan = virtual_layer_name
-
+        layer_to_scan = virtual_layer_name if not physical else physical_layer_name
         start_scan_address = 0
         if optimized and not physical and context.layers[layer_to_scan].metadata.architecture in ["Intel64"]:
             # TODO: change this value accordingly when 5-Level paging is supported.
             start_scan_address = (0x1f0 << 39)
 
-        kernel_pdb_names = [bytes(name + ".pdb", "utf-8") for name in constants.windows.KERNEL_MODULE_NAMES]
+        kernel_pdb_names = [
+            bytes(f'{name}.pdb', "utf-8")
+            for name in constants.windows.KERNEL_MODULE_NAMES
+        ]
+
         kernels = PDBUtility.pdbname_scan(ctx = context,
                                           layer_name = layer_to_scan,
                                           start = start_scan_address,
@@ -271,20 +274,26 @@ class KernelPDBScanner(interfaces.automagic.AutomagicInterface):
         # Scan a few megs of the virtual space at the location to see if they're potential kernels
 
         valid_kernel: Optional[ValidKernelType] = None
-        kernel_pdb_names = [bytes(name + ".pdb", "utf-8") for name in constants.windows.KERNEL_MODULE_NAMES]
+        kernel_pdb_names = [
+            bytes(f'{name}.pdb', "utf-8")
+            for name in constants.windows.KERNEL_MODULE_NAMES
+        ]
+
 
         virtual_layer_name = vlayer.name
         try:
             if vlayer.read(address, 0x2) == b'MZ':
-                res = list(
-                    PDBUtility.pdbname_scan(ctx = context,
-                                            layer_name = vlayer.name,
-                                            page_size = vlayer.page_size,
-                                            pdb_names = kernel_pdb_names,
-                                            progress_callback = progress_callback,
-                                            start = address,
-                                            end = address + self.max_pdb_size))
-                if res:
+                if res := list(
+                    PDBUtility.pdbname_scan(
+                        ctx=context,
+                        layer_name=vlayer.name,
+                        page_size=vlayer.page_size,
+                        pdb_names=kernel_pdb_names,
+                        progress_callback=progress_callback,
+                        start=address,
+                        end=address + self.max_pdb_size,
+                    )
+                ):
                     valid_kernel = (virtual_layer_name, address, res[0])
         except exceptions.InvalidAddressException:
             pass
@@ -342,8 +351,9 @@ class KernelPDBScanner(interfaces.automagic.AutomagicInterface):
             for sub_config_path, symbol_req in self._symbol_requirements:
                 parent_path = interfaces.configuration.parent_path(sub_config_path)
                 if symbol_req.unsatisfied(context, parent_path):
-                    valid_kernel = self.determine_valid_kernel(context, potential_layers, progress_callback)
-                    if valid_kernel:
+                    if valid_kernel := self.determine_valid_kernel(
+                        context, potential_layers, progress_callback
+                    ):
                         self.set_kernel_virtual_offset(context, valid_kernel)
                         self.recurse_symbol_fulfiller(context, valid_kernel, progress_callback)
 

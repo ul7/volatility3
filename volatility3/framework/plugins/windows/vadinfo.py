@@ -85,8 +85,12 @@ class VadInfo(interfaces.plugins.PluginInterface):
         kvo = context.layers[layer_name].config["kernel_virtual_offset"]
         ntkrnlmp = context.module(symbol_table, layer_name = layer_name, offset = kvo)
         addr = ntkrnlmp.get_symbol("MmProtectToValue").address
-        values = ntkrnlmp.object(object_type = "array", offset = addr, subtype = ntkrnlmp.get_type("int"), count = 32)
-        return values  # type: ignore
+        return ntkrnlmp.object(
+            object_type="array",
+            offset=addr,
+            subtype=ntkrnlmp.get_type("int"),
+            count=32,
+        )
 
     @classmethod
     def list_vads(cls, proc: interfaces.objects.ObjectInterface,

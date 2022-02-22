@@ -127,9 +127,10 @@ if __name__ == '__main__':
     with open(args.filename) as f:
         lines = f.readlines()
 
-    urls = []
-    for i in range(len(lines) // 2):
-        urls += [[lines[2 * i].strip(), lines[(2 * i) + 1].strip()]]
+    urls = [
+        [lines[2 * i].strip(), lines[(2 * i) + 1].strip()]
+        for i in range(len(lines) // 2)
+    ]
 
     d = Downloader(urls)
     d.download_lists(keep = args.keep)

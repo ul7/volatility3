@@ -55,9 +55,7 @@ class LayerStacker(interfaces.automagic.AutomagicInterface):
         if not requirement.unsatisfied(context, config_path):
             return None
 
-        # Bow out quickly if the UI hasn't provided a single_location
-        unsatisfied = self.unsatisfied(self.context, self.config_path)
-        if unsatisfied:
+        if unsatisfied := self.unsatisfied(self.context, self.config_path):
             vollog.info(f"Unable to run LayerStacker, unsatisfied requirement: {unsatisfied}")
             return list(unsatisfied)
         if not self.config or not self.config.get('single_location', None):
@@ -85,8 +83,9 @@ class LayerStacker(interfaces.automagic.AutomagicInterface):
         # If we're cached, find Now we need to find where to apply the stack configuration
         if self._cached:
             top_layer_name, subconfig = self._cached
-            result = self.find_suitable_requirements(context, config_path, requirement, [top_layer_name])
-            if result:
+            if result := self.find_suitable_requirements(
+                context, config_path, requirement, [top_layer_name]
+            ):
                 appropriate_config_path, layer_name = result
                 context.config.merge(appropriate_config_path, subconfig)
                 context.config[appropriate_config_path] = top_layer_name
@@ -109,9 +108,9 @@ class LayerStacker(interfaces.automagic.AutomagicInterface):
                                           progress_callback)
 
         if stacked_layers is not None:
-            # Applies the stacked_layers to each requirement in the requirements list
-            result = self.find_suitable_requirements(new_context, config_path, requirement, stacked_layers)
-            if result:
+            if result := self.find_suitable_requirements(
+                new_context, config_path, requirement, stacked_layers
+            ):
                 path, layer = result
                 # splice in the new configuration into the original context
                 context.config.merge(path, new_context.layers[layer].build_configuration())
@@ -194,10 +193,7 @@ class LayerStacker(interfaces.automagic.AutomagicInterface):
                            key = lambda x: x.stack_order)
         stacker_list = self.config.get('stackers', [])
         if len(stacker_list):
-            result = []
-            for stacker in stack_set:
-                if stacker.__name__ in stacker_list:
-                    result.append(stacker)
+            result = [stacker for stacker in stack_set if stacker.__name__ in stacker_list]
             stack_set = result
         return stack_set
 
@@ -215,22 +211,22 @@ class LayerStacker(interfaces.automagic.AutomagicInterface):
         """
         child_config_path = interfaces.configuration.path_join(config_path, requirement.name)
         if isinstance(requirement, requirements.TranslationLayerRequirement):
-            if requirement.unsatisfied(context, config_path):
-                original_setting = context.config.get(child_config_path, None)
-                for layer_name in stacked_layers:
-                    context.config[child_config_path] = layer_name
-                    if not requirement.unsatisfied(context, config_path):
-                        return child_config_path, layer_name
-                # Clean-up to restore the config
-                if original_setting:
-                    context.config[child_config_path] = original_setting
-                else:
-                    del context.config[child_config_path]
-            else:
+            if not requirement.unsatisfied(context, config_path):
                 return child_config_path, context.config.get(child_config_path, None)
+            original_setting = context.config.get(child_config_path, None)
+            for layer_name in stacked_layers:
+                context.config[child_config_path] = layer_name
+                if not requirement.unsatisfied(context, config_path):
+                    return child_config_path, layer_name
+            # Clean-up to restore the config
+            if original_setting:
+                context.config[child_config_path] = original_setting
+            else:
+                del context.config[child_config_path]
         for req_name, req in requirement.requirements.items():
-            result = cls.find_suitable_requirements(context, child_config_path, req, stacked_layers)
-            if result:
+            if result := cls.find_suitable_requirements(
+                context, child_config_path, req, stacked_layers
+            ):
                 return result
         return None
 
@@ -252,10 +248,13 @@ def choose_os_stackers(plugin: Type[interfaces.plugins.PluginInterface]) -> List
     # Ensure all stackers are loaded
     framework.import_files(sys.modules['volatility3.framework.layers'])
 
-    result = []
-    for stacker in sorted(framework.class_subclasses(interfaces.automagic.StackerLayerInterface),
-                          key = lambda x: x.stack_order):
-        if plugin_first_level in stacker.exclusion_list:
-            continue
-        result.append(stacker.__name__)
-    return result
+    return [
+        stacker.__name__
+        for stacker in sorted(
+            framework.class_subclasses(
+                interfaces.automagic.StackerLayerInterface
+            ),
+            key=lambda x: x.stack_order,
+        )
+        if plugin_first_level not in stacker.exclusion_list
+    ]

@@ -62,13 +62,8 @@ class Kevents(interfaces.plugins.PluginInterface):
         if filter_flags == 0 or filter_index not in self.all_filters:
             return ""
 
-        context = []
-
         filters = self.all_filters[filter_index]
-        for flag, index in filters:
-            if filter_flags & index == index:
-                context.append(flag)
-
+        context = [flag for flag, index in filters if filter_flags & index == index]
         return ",".join(context)
 
     @classmethod
@@ -90,8 +85,7 @@ class Kevents(interfaces.plugins.PluginInterface):
             return
 
         for klist in klist_array:
-            for kn in mac.MacUtilities.walk_slist(klist, "kn_link"):
-                yield kn
+            yield from mac.MacUtilities.walk_slist(klist, "kn_link")
 
     @classmethod
     def _get_task_kevents(cls, kernel, task):
@@ -102,19 +96,14 @@ class Kevents(interfaces.plugins.PluginInterface):
         """
         fdp = task.p_fd
 
-        for kn in cls._walk_klist_array(kernel, fdp, "fd_knlist", "fd_knlistsize"):
-            yield kn
-
-        for kn in cls._walk_klist_array(kernel, fdp, "fd_knhash", "fd_knhashmask"):
-            yield kn
-
+        yield from cls._walk_klist_array(kernel, fdp, "fd_knlist", "fd_knlistsize")
+        yield from cls._walk_klist_array(kernel, fdp, "fd_knhash", "fd_knhashmask")
         try:
             p_klist = task.p_klist
         except exceptions.InvalidAddressException:
             return
 
-        for kn in mac.MacUtilities.walk_slist(p_klist, "kn_link"):
-            yield kn
+        yield from mac.MacUtilities.walk_slist(p_klist, "kn_link")
 
     @classmethod
     def list_kernel_events(cls,

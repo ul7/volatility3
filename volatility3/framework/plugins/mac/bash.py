@@ -60,15 +60,17 @@ class Bash(plugins.PluginInterface, timeliner.TimeLinerInterface):
 
             proc_layer = self.context.layers[proc_layer_name]
 
-            bang_addrs = []
+            bang_addrs = [
+                struct.pack(pack_format, address)
+                for address in proc_layer.scan(
+                    self.context,
+                    scanners.BytesScanner(b"#"),
+                    sections=task.get_process_memory_sections(
+                        self.context, self.config['kernel'], rw_no_file=True
+                    ),
+                )
+            ]
 
-            # find '#' values on the heap
-            for address in proc_layer.scan(self.context,
-                                           scanners.BytesScanner(b"#"),
-                                           sections = task.get_process_memory_sections(self.context,
-                                                                                       self.config['kernel'],
-                                                                                       rw_no_file = True)):
-                bang_addrs.append(struct.pack(pack_format, address))
 
             history_entries = []
 

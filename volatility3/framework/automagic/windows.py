@@ -64,10 +64,12 @@ class DtbSelfReferential:
             # we can move on
             if (ptr & self.reserved_bits) and (ptr & 0x01):
                 return None
-            if ((ptr & self.mask) == (data_offset + page_offset)) and (data_offset + page_offset > 0):
-                # Pointer must be valid
-                if (ptr & 0x01):
-                    ref_pages.add(ref)
+            if (
+                ((ptr & self.mask) == (data_offset + page_offset))
+                and (data_offset + page_offset > 0)
+                and (ptr & 0x01)
+            ):
+                ref_pages.add(ref)
 
         # The DTB is extremely unlikely to refer back to itself. so the number of reference should always be exactly 1
         if len(ref_pages) == 1:
@@ -257,10 +259,10 @@ class WinSwapLayers(interfaces.automagic.AutomagicInterface):
                 # We need this so the type-checker knows we're a TranslationLayerRequirement
                 continue
             swap_sub_config, swap_req = self.find_swap_requirement(trans_sub_config, trans_req)
-            counter = 0
             swap_config = interfaces.configuration.parent_path(swap_sub_config)
 
             if swap_req and swap_req.unsatisfied(context, swap_config):
+                counter = 0
                 # See if any of them need constructing
                 for swap_location in self.config.get('single_swap_locations', []):
                     # Setup config locations/paths

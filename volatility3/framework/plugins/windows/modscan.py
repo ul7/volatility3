@@ -128,11 +128,14 @@ class ModScan(interfaces.plugins.PluginInterface):
             Layer name or None if no layers that contain the base address can be found
         """
 
-        for layer_name in session_layers:
-            if context.layers[layer_name].is_valid(base_address):
-                return layer_name
-
-        return None
+        return next(
+            (
+                layer_name
+                for layer_name in session_layers
+                if context.layers[layer_name].is_valid(base_address)
+            ),
+            None,
+        )
 
     def _generator(self):
         kernel = self.context.modules[self.config['kernel']]
@@ -162,15 +165,16 @@ class ModScan(interfaces.plugins.PluginInterface):
                 session_layer_name = self.find_session_layer(self.context, session_layers, mod.DllBase)
                 file_output = f"Cannot find a viable session layer for {mod.DllBase:#x}"
                 if session_layer_name:
-                    file_handle = dlllist.DllList.dump_pe(self.context,
-                                                          pe_table_name,
-                                                          mod,
-                                                          self.open,
-                                                          layer_name = session_layer_name)
-                    file_output = "Error outputting file"
-                    if file_handle:
+                    if file_handle := dlllist.DllList.dump_pe(
+                        self.context,
+                        pe_table_name,
+                        mod,
+                        self.open,
+                        layer_name=session_layer_name,
+                    ):
                         file_output = file_handle.preferred_filename
-
+                    else:
+                        file_output = "Error outputting file"
             yield (0, (format_hints.Hex(mod.vol.offset), format_hints.Hex(mod.DllBase),
                        format_hints.Hex(mod.SizeOfImage), BaseDllName, FullDllName, file_output))
 

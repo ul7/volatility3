@@ -57,8 +57,7 @@ class IMAGE_DOS_HEADER(objects.StructType):
         member_size = self._context.symbol_space.get_type(item.vol.type_name).size
         start = item.vol.offset - sect.vol.offset
         newval = objects.convert_value_to_data(value, int, item.vol.data_format)
-        result = header[:start] + newval + header[start + member_size:]
-        return result
+        return header[:start] + newval + header[start + member_size:]
 
     def fix_image_base(self, raw_data: bytes, nt_header: interfaces.objects.ObjectInterface) -> bytes:
         """Fix the _OPTIONAL_HEADER.ImageBase value (which is either an

@@ -48,9 +48,7 @@ class SymbolInterface:
     def type_name(self) -> Optional[str]:
         """Returns the name of the type that the symbol represents."""
         # Objects and ObjectTemplates should *always* get a type_name when they're constructed, so allow the IndexError
-        if self.type is None:
-            return None
-        return self.type.vol['type_name']
+        return None if self.type is None else self.type.vol['type_name']
 
     @property
     def type(self) -> Optional[objects.Template]:
@@ -297,7 +295,7 @@ class SymbolTableInterface(BaseSymbolTableInterface, configuration.ConfigurableI
         config = super().build_configuration()
 
         # Symbol Tables are constructable, and therefore require a class configuration variable
-        config["class"] = self.__class__.__module__ + "." + self.__class__.__name__
+        config["class"] = f'{self.__class__.__module__}.{self.__class__.__name__}'
         return config
 
     @classmethod

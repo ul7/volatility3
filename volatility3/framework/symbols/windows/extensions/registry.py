@@ -94,10 +94,11 @@ class CM_KEY_BODY(objects.StructType):
         checking for Flags that contain KEY_HIVE_ENTRY."""
 
         # _CM_KEY_BODY.Trans introduced in Win10 14393
-        if hasattr(self, "Trans") and RegKeyFlags.KEY_HIVE_ENTRY & kcb_flags == RegKeyFlags.KEY_HIVE_ENTRY:
-            return True
-
-        return False
+        return bool(
+            hasattr(self, "Trans")
+            and RegKeyFlags.KEY_HIVE_ENTRY & kcb_flags
+            == RegKeyFlags.KEY_HIVE_ENTRY
+        )
 
     def get_full_key_name(self) -> str:
         output = []
@@ -153,9 +154,9 @@ class CM_KEY_NODE(objects.StructType):
         listjump = None
         if signature == 'ri':
             listjump = 1
-        elif signature == 'lh' or signature == 'lf':
+        elif signature in ['lh', 'lf']:
             listjump = 2
-        elif node.vol.type_name.endswith(constants.BANG + "_CM_KEY_NODE"):
+        elif node.vol.type_name.endswith(f'{constants.BANG}_CM_KEY_NODE'):
             yield node
         else:
             vollog.debug("Unexpected node type encountered when traversing subkeys: {}, signature: {}".format(
@@ -213,7 +214,7 @@ class CM_KEY_NODE(objects.StructType):
         if self.vol.offset == reg.root_cell_offset + 4:
             # return the last part of the hive name for the root entry
             return reg.get_name().split('\\')[-1]
-        return reg.get_node(self.Parent).get_key_path() + '\\' + self.get_name()
+        return f'{reg.get_node(self.Parent).get_key_path()}\\{self.get_name()}'
 
 
 class CM_KEY_VALUE(objects.StructType):
@@ -239,7 +240,7 @@ class CM_KEY_VALUE(objects.StructType):
         if datalen & 0x80000000:
             # Remove the high bit
             datalen = datalen & 0x7fffffff
-            if (0 > datalen or datalen > 4):
+            if datalen < 0 or datalen > 4:
                 raise ValueError(f"Unable to read inline registry value with excessive length: {datalen}")
             else:
                 data = layer.read(self.Data.vol.offset, datalen)

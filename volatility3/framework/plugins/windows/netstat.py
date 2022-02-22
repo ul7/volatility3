@@ -91,9 +91,12 @@ class NetStat(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
         for idx in range(bitmap_size_in_byte):
             current_byte = context.layers[layer_name].read(bitmap_offset + idx, 1)[0]
             current_offs = idx * 8
-            for bit in range(8):
-                if current_byte & (1 << bit) != 0:
-                    ret.append(bit + current_offs)
+            ret.extend(
+                bit + current_offs
+                for bit in range(8)
+                if current_byte & (1 << bit) != 0
+            )
+
         return ret
 
     @classmethod
@@ -103,8 +106,7 @@ class NetStat(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
                                      net_symbol_table: str,
                                      port: int,
                                      port_pool_addr: int,
-                                     proto = "tcp") -> \
-            Iterable[interfaces.objects.ObjectInterface]:
+                                     proto = "tcp") -> Iterable[interfaces.objects.ObjectInterface]:
         """Lists all UDP Endpoints and TCP Listeners by parsing UdpPortPool and TcpPortPool.
 
         Args:
@@ -147,11 +149,7 @@ class NetStat(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
         if not assignment:
             return
 
-        # the value within assignment.Entry is a) masked and b) points inside of the network object
-        # first decode the pointer
-        netw_inside = cls._decode_pointer(assignment.Entry)
-
-        if netw_inside:
+        if netw_inside := cls._decode_pointer(assignment.Entry):
             # if the value is valid, calculate the actual object address by subtracting the offset
             curr_obj = context.object(obj_name, layer_name = layer_name, offset = netw_inside - ptr_offset)
             yield curr_obj
@@ -159,10 +157,11 @@ class NetStat(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
             # if the same port is used on different interfaces multiple objects are created
             # those can be found by following the pointer within the object's `Next` field until it is empty
             while curr_obj.Next:
-                curr_obj = context.object(obj_name,
-                                          layer_name = layer_name,
-                                          offset = cls._decode_pointer(curr_obj.Next) - ptr_offset)
-                yield curr_obj
+                yield context.object(
+                    obj_name,
+                    layer_name=layer_name,
+                    offset=cls._decode_pointer(curr_obj.Next) - ptr_offset,
+                )
 
     @classmethod
     def get_tcpip_module(cls, context: interfaces.context.ContextInterface, layer_name: str,
@@ -260,8 +259,11 @@ class NetStat(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
                 for endpoint_entry in cls.parse_hashtable(context, layer_name, partition.Endpoints.Directory,
                                                           partition.Endpoints.TableSize, alignment, net_symbol_table):
 
-                    endpoint = context.object(obj_name, layer_name = layer_name, offset = endpoint_entry - entry_offset)
-                    yield endpoint
+                    yield context.object(
+                        obj_name,
+                        layer_name=layer_name,
+                        offset=endpoint_entry - entry_offset,
+                    )
 
     @classmethod
     def create_tcpip_symbol_table(cls, context: interfaces.context.ContextInterface, config_path: str, layer_name: str,
@@ -359,8 +361,7 @@ class NetStat(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
                      nt_symbols: str,
                      net_symbol_table: str,
                      tcpip_module_offset: int,
-                     tcpip_symbol_table: str) -> \
-            Iterable[interfaces.objects.ObjectInterface]:
+                     tcpip_symbol_table: str) -> Iterable[interfaces.objects.ObjectInterface]:
         """Lists all UDP Endpoints, TCP Listeners and TCP Endpoints in the primary layer that
         are in tcpip.sys's UdpPortPool, TcpPortPool and TCP Endpoint partition table, respectively.
 
@@ -377,9 +378,13 @@ class NetStat(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
         """
 
         # first, TCP endpoints by parsing the partition table
-        for endpoint in cls.parse_partitions(context, layer_name, net_symbol_table, tcpip_symbol_table,
-                                             tcpip_module_offset):
-            yield endpoint
+        yield from cls.parse_partitions(
+            context,
+            layer_name,
+            net_symbol_table,
+            tcpip_symbol_table,
+            tcpip_module_offset,
+        )
 
         # then, towards the UDP and TCP port pools
         # first, find their addresses
@@ -406,15 +411,17 @@ class NetStat(interfaces.plugins.PluginInterface, timeliner.TimeLinerInterface):
             # port value can be 0, which we can skip
             if not port:
                 continue
-            for obj in cls.enumerate_structures_by_port(context, layer_name, net_symbol_table, port, tpp_addr, "tcp"):
-                yield obj
+            yield from cls.enumerate_structures_by_port(
+                context, layer_name, net_symbol_table, port, tpp_addr, "tcp"
+            )
 
         for port in udpa_ports:
             # same as above, skip port 0
             if not port:
                 continue
-            for obj in cls.enumerate_structures_by_port(context, layer_name, net_symbol_table, port, upp_addr, "udp"):
-                yield obj
+            yield from cls.enumerate_structures_by_port(
+                context, layer_name, net_symbol_table, port, upp_addr, "udp"
+            )
 
     def _generator(self, show_corrupt_results: Optional[bool] = None):
         """ Generates the network objects for use in rendering. """

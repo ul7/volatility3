@@ -50,9 +50,7 @@ def round(addr: int, align: int, up: bool = False) -> int:
     if addr % align == 0:
         return addr
     else:
-        if up:
-            return (addr + (align - (addr % align)))
-        return (addr - (addr % align))
+        return (addr + (align - (addr % align))) if up else (addr - (addr % align))
 
 
 # For vol3 devs:
@@ -100,12 +98,20 @@ def convert_network_four_tuple(family, four_tuple):
     """
 
     if family == socket.AF_INET:
-        ret = (convert_ipv4(four_tuple[0]), convert_port(four_tuple[1]), convert_ipv4(four_tuple[2]),
-               convert_port(four_tuple[3]))
-    elif family == socket.AF_INET6:
-        ret = (convert_ipv6(four_tuple[0]), convert_port(four_tuple[1]), convert_ipv6(four_tuple[2]),
-               convert_port(four_tuple[3]))
-    else:
-        ret = None
+        return (
+            convert_ipv4(four_tuple[0]),
+            convert_port(four_tuple[1]),
+            convert_ipv4(four_tuple[2]),
+            convert_port(four_tuple[3]),
+        )
 
-    return ret
+    elif family == socket.AF_INET6:
+        return (
+            convert_ipv6(four_tuple[0]),
+            convert_port(four_tuple[1]),
+            convert_ipv6(four_tuple[2]),
+            convert_port(four_tuple[3]),
+        )
+
+    else:
+        return None

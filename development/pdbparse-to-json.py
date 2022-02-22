@@ -27,10 +27,10 @@ class PDBRetreiver:
         logger.info("Download PDB file...")
         file_name = ".".join(file_name.split(".")[:-1] + ['pdb'])
         for sym_url in ['http://msdl.microsoft.com/download/symbols']:
-            url = sym_url + f"/{file_name}/{guid}/"
+            url = f'{sym_url}/{file_name}/{guid}/'
 
             result = None
-            for suffix in [file_name[:-1] + '_', file_name]:
+            for suffix in [f'{file_name[:-1]}_', file_name]:
                 try:
                     logger.debug(f"Attempting to retrieve {url + suffix}")
                     result, _ = request.urlretrieve(url + suffix)
@@ -132,14 +132,13 @@ class PDBConvertor:
 
     def read_pdb(self) -> Dict:
         """Reads in the PDB file and forms essentially a python dictionary of necessary data"""
-        output = {
+        return {
             "user_types": self.read_usertypes(),
             "enums": self.read_enums(),
             "metadata": self.generate_metadata(),
             "symbols": self.read_symbols(),
             "base_types": self.read_basetypes()
         }
-        return output
 
     def generate_metadata(self) -> Dict[str, Any]:
         """Generates the metadata necessary for this object"""
@@ -153,7 +152,7 @@ class PDBConvertor:
             "database": "ntkrnlmp.pdb",
             "machine_type": int(dbg.machine)
         }
-        result = {
+        return {
             "format": "6.0.0",
             "producer": {
                 "datetime": datetime.datetime.now().isoformat(),
@@ -164,7 +163,6 @@ class PDBConvertor:
                 "pdb": pdb_data
             }
         }
-        return result
 
     def read_enums(self) -> Dict:
         """Reads the Enumerations from the PDB file"""
@@ -178,14 +176,18 @@ class PDBConvertor:
         return output
 
     def _format_enum(self, user_enum):
-        output = {
+        return {
             user_enum.name: {
                 'base': self.lookup_ctype(user_enum.utype),
                 'size': self._determine_size(user_enum.utype),
-                'constants': dict([(enum.name, enum.enum_value) for enum in user_enum.fieldlist.substructs])
+                'constants': dict(
+                    [
+                        (enum.name, enum.enum_value)
+                        for enum in user_enum.fieldlist.substructs
+                    ]
+                ),
             }
         }
-        return output
 
     def read_symbols(self) -> Dict:
         """Reads the symbols from the PDB file"""
@@ -242,7 +244,7 @@ class PDBConvertor:
         output = None
         if isinstance(field, str):
             output = self.base_type_size[field]
-        elif (field.leaf_type == "LF_STRUCTURE" or field.leaf_type == "LF_ARRAY" or field.leaf_type == "LF_UNION"):
+        elif field.leaf_type in ["LF_STRUCTURE", "LF_ARRAY", "LF_UNION"]:
             output = field.size
         elif field.leaf_type == "LF_POINTER":
             output = self.base_type_size[field.ptr_attr.type]
@@ -302,18 +304,16 @@ class PDBConvertor:
 
     def read_basetypes(self) -> Dict:
         """Reads the base types from the PDB file"""
-        ptr_size = 4
-        if "64" in self._pdb.STREAM_DBI.machine:
-            ptr_size = 8
-
+        ptr_size = 8 if "64" in self._pdb.STREAM_DBI.machine else 4
         output = {"pointer": {"endian": "little", "kind": "int", "signed": False, "size": ptr_size}}
         for index in self._seen_ctypes:
             output[self.ctype[index]] = {
                 "endian": "little",
                 "kind": self.ctype_python_types.get(self.ctype[index], "int"),
-                "signed": False if "_U" in index else True,
-                "size": self.base_type_size[index]
+                "signed": "_U" not in index,
+                "size": self.base_type_size[index],
             }
+
         return output
 
 

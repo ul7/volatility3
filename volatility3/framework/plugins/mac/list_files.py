@@ -78,8 +78,7 @@ class List_Files(plugins.PluginInterface):
             if v_name is None:
                 return added
 
-            parent = cls._get_parent(context, vnode)
-            if parent:
+            if parent := cls._get_parent(context, vnode):
                 parent_val = parent.vol.offset
             else:
                 parent_val = None
@@ -166,11 +165,7 @@ class List_Files(plugins.PluginInterface):
 
             path.insert(0, parent_name)
 
-        if len(path) > 1:
-            path = "/".join(path)
-        else:
-            path = vnode_name
-
+        path = "/".join(path) if len(path) > 1 else vnode_name
         if path.startswith("//"):
             path = path[1:]
 

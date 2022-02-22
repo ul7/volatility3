@@ -91,10 +91,12 @@ class MacUtilities(interfaces.configuration.VersionableInterface):
         for name, start, end in handlers:
             if start <= target_address <= end:
                 mod_name = name
-                if name == "__kernel__":
-                    symbols = list(context.symbol_space.get_symbols_by_location(target_address - module_shift))
-
-                    if len(symbols) > 0:
+                if mod_name == "__kernel__":
+                    if symbols := list(
+                        context.symbol_space.get_symbols_by_location(
+                            target_address - module_shift
+                        )
+                    ):
                         symbol_name = str(symbols[0].split(constants.BANG)[1]) if constants.BANG in symbols[0] else \
                             str(symbols[0])
 
@@ -197,8 +199,9 @@ class MacUtilities(interfaces.configuration.VersionableInterface):
                    next_member: str,
                    max_elements: int = 4096) -> Iterable[interfaces.objects.ObjectInterface]:
 
-        for element in cls._walk_iterable(queue, "tqh_first", "tqe_next", next_member, max_elements):
-            yield element
+        yield from cls._walk_iterable(
+            queue, "tqh_first", "tqe_next", next_member, max_elements
+        )
 
     @classmethod
     def walk_list_head(cls,
@@ -206,8 +209,9 @@ class MacUtilities(interfaces.configuration.VersionableInterface):
                        next_member: str,
                        max_elements: int = 4096) -> Iterable[interfaces.objects.ObjectInterface]:
 
-        for element in cls._walk_iterable(queue, "lh_first", "le_next", next_member, max_elements):
-            yield element
+        yield from cls._walk_iterable(
+            queue, "lh_first", "le_next", next_member, max_elements
+        )
 
     @classmethod
     def walk_slist(cls,
@@ -215,5 +219,6 @@ class MacUtilities(interfaces.configuration.VersionableInterface):
                    next_member: str,
                    max_elements: int = 4096) -> Iterable[interfaces.objects.ObjectInterface]:
 
-        for element in cls._walk_iterable(queue, "slh_first", "sle_next", next_member, max_elements):
-            yield element
+        yield from cls._walk_iterable(
+            queue, "slh_first", "sle_next", next_member, max_elements
+        )

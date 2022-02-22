@@ -199,7 +199,7 @@ class IntermediateSymbolTable(interfaces.symbols.SymbolTableInterface):
                     pass
 
             # Finally try looking in zip files
-            zip_path = os.path.join(path, sub_path + ".zip")
+            zip_path = os.path.join(path, f'{sub_path}.zip')
             if os.path.exists(zip_path):
                 # We have a zipfile, so run through it and look for sub files that match the filename
                 with zipfile.ZipFile(zip_path) as zfile:
@@ -207,7 +207,7 @@ class IntermediateSymbolTable(interfaces.symbols.SymbolTableInterface):
                         for extension in extensions:
                             # By ending with an extension (and therefore, not /), we should not return any directories
                             if name.endswith(zip_match + extension) or (zip_match == "*" and name.endswith(extension)):
-                                yield "jar:file:" + str(pathlib.Path(zip_path)) + "!" + name
+                                yield f'jar:file:{str(pathlib.Path(zip_path))}!{name}'
 
     @classmethod
     def create(cls,
@@ -274,7 +274,7 @@ class ISFormatTable(interfaces.symbols.SymbolTableInterface, metaclass = ABCMeta
         nt = native_types or self._get_natives()
         if nt is None:
             raise TypeError("Native table not provided")
-        nt.name = name + "_natives"
+        nt.name = f'{name}_natives'
         super().__init__(context, config_path, name, nt, table_mapping = table_mapping)
         self._overrides: Dict[str, Type[interfaces.objects.ObjectInterface]] = {}
         self._symbol_cache: Dict[str, interfaces.symbols.SymbolInterface] = {}
@@ -392,9 +392,11 @@ class Version1Format(ISFormatTable):
             elif type_name == 'bitfield':
                 update = {
                     'start_bit': dictionary['bit_position'],
-                    'end_bit': dictionary['bit_position'] + dictionary['bit_length']
+                    'end_bit': dictionary['bit_position']
+                    + dictionary['bit_length'],
+                    'base_type': self._interdict_to_template(dictionary['type']),
                 }
-                update['base_type'] = self._interdict_to_template(dictionary['type'])
+
             # We do *not* call native_template.clone(), since it slows everything down a lot
             # We require that the native.get_type method always returns a newly constructed python object
             native_template.update_vol(**update)
@@ -420,8 +422,10 @@ class Version1Format(ISFormatTable):
         lookup = self._json_object['enums'].get(name, None)
         if not lookup:
             raise exceptions.SymbolSpaceError(f"Unknown enumeration: {name}")
-        result = {"choices": copy.deepcopy(lookup['constants']), "base_type": self.natives.get_type(lookup['base'])}
-        return result
+        return {
+            "choices": copy.deepcopy(lookup['constants']),
+            "base_type": self.natives.get_type(lookup['base']),
+        }
 
     def get_enumeration(self, enum_name: str) -> interfaces.objects.Template:
         """Resolves an individual enumeration."""

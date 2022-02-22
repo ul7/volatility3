@@ -55,16 +55,20 @@ class PdbMultiStreamFormat(linear.LinearlyMappedLayer):
                                    offset = self._header.vol.size,
                                    count = root_index_size,
                                    subtype = module.get_type("unsigned long"))
-        root_index_layer_name = self.create_stream_from_pages("root_index", self._header.StreamInfo.StreamInfoSize,
-                                                              [x for x in root_index])
+        root_index_layer_name = self.create_stream_from_pages(
+            "root_index", self._header.StreamInfo.StreamInfoSize, list(root_index)
+        )
+
 
         module = self.context.module(self.pdb_symbol_table, root_index_layer_name, offset = 0)
         root_pages = module.object(object_type = "array",
                                    offset = 0,
                                    count = root_table_num_pages,
                                    subtype = module.get_type("unsigned long"))
-        root_layer_name = self.create_stream_from_pages("root", self._header.StreamInfo.StreamInfoSize,
-                                                        [x for x in root_pages])
+        root_layer_name = self.create_stream_from_pages(
+            "root", self._header.StreamInfo.StreamInfoSize, list(root_pages)
+        )
+
 
         module = self.context.module(self.pdb_symbol_table, root_layer_name, offset = 0)
         num_streams = module.object(object_type = "unsigned long", offset = 0)
@@ -85,12 +89,15 @@ class PdbMultiStreamFormat(linear.LinearlyMappedLayer):
                                                  count = list_size,
                                                  subtype = module.get_type("unsigned long"))
                 current_offset += (list_size * entry_size)
-                self._streams[stream] = self.create_stream_from_pages("stream" + str(stream), stream_sizes[stream],
-                                                                      [x for x in stream_page_list])
+                self._streams[stream] = self.create_stream_from_pages(
+                    "stream" + str(stream),
+                    stream_sizes[stream],
+                    list(stream_page_list),
+                )
 
     def create_stream_from_pages(self, stream_name: str, maximum_size: int, pages: List[int]) -> str:
         # Construct a root layer based on a number of pages
-        layer_name = self.name + "_" + stream_name
+        layer_name = f'{self.name}_{stream_name}'
         path_join = interfaces.configuration.path_join
         config_path = path_join(self.config_path, stream_name)
         self.context.config[path_join(config_path, 'base_layer')] = self.name
@@ -106,9 +113,13 @@ class PdbMultiStreamFormat(linear.LinearlyMappedLayer):
         for header in self._headers:
             header_type = self.pdb_symbol_table + constants.BANG + header
             current_header = self.context.object(header_type, self._base_layer, 0)
-            if utility.array_to_string(current_header.Magic) == self._headers[header]:
-                if not (current_header.PageSize < 0x100 or current_header.PageSize > (128 * 0x10000)):
-                    return header, current_header
+            if (
+                utility.array_to_string(current_header.Magic)
+                == self._headers[header]
+                and current_header.PageSize >= 0x100
+                and current_header.PageSize <= 128 * 0x10000
+            ):
+                return header, current_header
         return None
 
     @property

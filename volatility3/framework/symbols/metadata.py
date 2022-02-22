@@ -24,9 +24,7 @@ class WindowsMetadata(interfaces.symbols.MetadataInterface):
 
     @property
     def pe_version_string(self) -> Optional[str]:
-        if self.pe_version is None:
-            return None
-        return ".".join(self.pe_version)
+        return None if self.pe_version is None else ".".join(self.pe_version)
 
     @property
     def pdb_guid(self) -> Optional[str]:
